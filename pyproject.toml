@@ -1,0 +1,27 @@
+[project]
+name = "utatomo"
+version = "0.1.0"
+description = "咏伴：日英双语歌词跟唱助手"
+license = "GPL-3.0-only"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "PySide6>=6.8,<6.11",
+  "fugashi>=1.4,<2",
+  "unidic-lite==1.0.8",
+  "pykakasi>=2.3,<3",
+  "cmudict>=1.1,<2",
+  "requests>=2.32,<3",
+  "winrt-runtime>=3,<4; sys_platform == 'win32'",
+  "winrt-Windows.Media.Control>=3,<4; sys_platform == 'win32'",
+  "winrt-Windows.Foundation>=3,<4; sys_platform == 'win32'",
+  "winrt-Windows.Foundation.Collections>=3,<4; sys_platform == 'win32'",
+  "websocket-client>=1.8,<2",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.16,<7",
+]

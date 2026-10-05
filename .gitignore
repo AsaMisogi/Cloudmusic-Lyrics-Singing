@@ -1,0 +1,11 @@
+.venv/
+.runtime/
+.cache/
+__pycache__/
+*.pyc
+data/
+output/
+build/
+dist/
+.ruff_cache/
+.tools/

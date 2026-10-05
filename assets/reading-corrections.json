@@ -1,0 +1,12 @@
+[
+  {
+    "songIds": ["531051181", "2154799261"],
+    "linePrefix": "額に感じる",
+    "tokenStart": 0,
+    "text": "額",
+    "reading": "ひたい",
+    "source": "歌曲读音勘误：ふゆびより（用户听音确认；UtaTen 注音与单曲版罗马音交叉核对）",
+    "reference": "https://utaten.com/lyric/qk18010023/",
+    "checked": "2026-10-02"
+  }
+]
