@@ -2,7 +2,10 @@
 
 Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌词，也可以打开本地音频练唱；原文、日语假名或英语音标、中文译文在同一窗口显示。
 
-作者：[朝禊ASOGI](https://space.bilibili.com/315312) · [AsaMisogi](https://github.com/AsaMisogi)
+作者：[朝禊ASOGI](https://space.bilibili.com/315312) 
+
+注：该项目由AI辅助完成。
+
 
 ## 下载与启动
 
