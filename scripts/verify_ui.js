@@ -153,6 +153,18 @@
   updateHighlight(52200);
   check('52.2秒才进入下一句', state.active===1);
   updatePlayback({position:51000,duration:310000,playing:false,canSeek:true});
+  // 原生按键另由 verify_shortcuts.py 覆盖；此处补充重复和输入法标志。
+  $('followMode').focus();
+  const countBefore = actions.length;
+  const heldSpace = new KeyboardEvent('keydown', {code:'Space',key:' ',repeat:true,bubbles:true,cancelable:true});
+  $('followMode').dispatchEvent(heldSpace);
+  check('长按空格取消默认行为且不重复切换', heldSpace.defaultPrevented && actions.length === countBefore);
+  $('followMode').dispatchEvent(new KeyboardEvent('keydown', {code:'Space',key:' ',isComposing:true,bubbles:true,cancelable:true}));
+  check('输入法组合期间不触发播放', actions.length === countBefore);
+  const editor = document.createElement('div'); editor.contentEditable = 'true'; document.body.append(editor);
+  editor.dispatchEvent(new KeyboardEvent('keydown', {code:'Space',key:' ',bubbles:true,cancelable:true}));
+  check('可编辑内容正常接收空格', actions.length === countBefore);
+  editor.remove();
   // 直接采样 rAF 间隔，以证据确认是否仍被引擎锁在 60 FPS。
   let stamps = [];
   await new Promise(resolve => {

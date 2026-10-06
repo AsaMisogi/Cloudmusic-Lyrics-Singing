@@ -795,31 +795,53 @@ $("correctForm").onsubmit = (e) => {
 };
 $("dictionaryWeb").onclick = () =>
   action("dictionaryWeb", state.token?.lemma || state.token?.text || "");
+// 统一在捕获阶段分派快捷键：先取消控件默认行为，再执行唯一的播放操作。
+// 文本编辑、输入法组合和模态弹窗保留原生键盘交互；按钮、开关、滑块、
+// 下拉框的焦点不改变快捷键含义。未绑定的键（如 Enter、Tab）仍交给控件。
+function acceptsPlaybackShortcut(e) {
+  const target = e.target;
+  const editing = target.isContentEditable || target.closest("[contenteditable]:not([contenteditable='false'])") ||
+    target.tagName === "TEXTAREA" ||
+    (target.tagName === "INPUT" && !["checkbox", "radio", "range", "button", "submit", "reset"].includes(target.type));
+  return !editing && !e.isComposing && !document.querySelector("dialog[open]");
+}
 document.addEventListener("keydown", (e) => {
-  if (
-    document.querySelector("dialog[open]") ||
-    ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(e.target.tagName) ||
-    e.ctrlKey ||
-    e.metaKey ||
-    e.altKey
-  )
+  if (!acceptsPlaybackShortcut(e)) return;
+  // 隐藏入口仅响应明确组合键；与普通播放快捷键及文字输入互不冲突。
+  if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.code === "KeyM") {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!e.repeat) action("chime");
     return;
-  if (e.code === "Space") {
-    e.preventDefault();
-    action("toggle");
-  } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-    e.preventDefault();
-    seek(
-      estimatedPosition() +
-        (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 10 : 100),
-    );
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  const bound = e.code === "Space" || ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key) ||
+    ["l", "[", "]"].includes(key);
+  if (!bound) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  // 长按方向键可连续微调；播放和循环是状态切换，长按只能触发一次。
+  if (e.repeat && !e.key.startsWith("Arrow")) return;
+  if (e.code === "Space") action("toggle");
+  else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    seek(estimatedPosition() + (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 10 : 100));
   } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-    e.preventDefault();
     goLine(e.key === "ArrowUp" ? -1 : 1);
-  } else if (e.key.toLowerCase() === "l") loopLine();
-  else if (e.key === "[") $("setA").click();
-  else if (e.key === "]") $("setB").click();
-});
+  } else if (key === "l") loopLine();
+  else if (key === "[") $("setA").click();
+  else if (key === "]") $("setB").click();
+}, true);
+// 部分原生按钮在松开空格时激活，连同 keyup 一并取消，避免二次操作。
+document.addEventListener("keyup", e => {
+  if (e.code === "Space" && acceptsPlaybackShortcut(e) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, true);
+// 双击侧栏图标也能触发，重复触发由后端从头播放，不堆积音频实例。
+document.querySelector(".brand img").ondblclick = () => action("chime");
+
 try {
   const p = JSON.parse(localStorage.getItem("utatomo-display") || "{}");
   if (p.ruby !== undefined) $("rubyToggle").checked = p.ruby;

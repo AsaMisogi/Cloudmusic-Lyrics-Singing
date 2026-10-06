@@ -7,7 +7,7 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 root = Path(SPECPATH)
 datas = [(str(root / name), name) for name in ("web", "samples")]
 datas += [(str(root / "assets" / name), "assets") for name in
-          ("icon.svg", "icon.ico", "landscape.svg", "reading-corrections.json")]
+          ("icon.svg", "icon.ico", "landscape.svg", "reading-corrections.json", "chime.wav")]
 datas += [(str(root / "utatomo/client_bridge.js"), "utatomo")]
 binaries = []
 hiddenimports = []

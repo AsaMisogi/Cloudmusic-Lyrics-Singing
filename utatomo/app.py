@@ -118,6 +118,8 @@ class Bridge(QObject):
         self.client_timer.setInterval(500)
         self.client_timer.timeout.connect(self._check_client_connection)
         self.incoming.connect(self._receive)
+        self.chime_player = None
+        self.chime_audio = None
         self.player = QMediaPlayer(self)
         self.audio = QAudioOutput(self)
         self.audio.setVolume(0.8)
@@ -261,6 +263,8 @@ class Bridge(QObject):
                     self.versions.append({"id": key, "label": Path(path).name,
                                           "text": text, "translation": "", "source": Path(path).name})
                     self._select_version(key)
+        elif name == "chime":
+            self._play_chime()
         elif name == "toggle":
             if self.mode == "cloud":
                 self.cloud.command("toggle")
@@ -792,10 +796,30 @@ class Bridge(QObject):
                     },
                 )
 
+    def _play_chime(self):
+        """按需创建独立音效播放器，不接入歌曲进度、模式、循环或播放状态。
+
+        音效使用随包资源路径，源码和 PyInstaller 均无需依赖导出目录。
+        每次先停止再播放，从头重播且最多一个实例；退出时显式停止。
+        """
+        if self.chime_player is None:
+            self.chime_audio = QAudioOutput(self)
+            self.chime_audio.setVolume(0.8)
+            self.chime_player = QMediaPlayer(self)
+            self.chime_player.setAudioOutput(self.chime_audio)
+            self.chime_player.errorOccurred.connect(
+                lambda error, message: self.send("error", {"message": "音效播放失败：" + message})
+            )
+            self.chime_player.setSource(QUrl.fromLocalFile(str(ROOT / "assets" / "chime.wav")))
+        self.chime_player.stop()
+        self.chime_player.play()
+
     def close(self):
         self.timer.stop()
         self.client_timer.stop()
         self.player.stop()
+        if self.chime_player is not None:
+            self.chime_player.stop()
         self.cloud.close()
         self.language_pool.shutdown(wait=False, cancel_futures=True)
         self.network_pool.shutdown(wait=False, cancel_futures=True)
@@ -915,7 +939,27 @@ def main():
             page.runJavaScript(
                 "document.getElementById('toast').hidden=true; showWord(state.lines[0].tokens.find(t=>t.text==='光'));"
             )
-            QTimer.singleShot(1000, capture)
+            QTimer.singleShot(1000, exercise_chime)
+
+        def exercise_chime():
+            # 经真实桥接触发并解码随包音效，确认不覆盖已暂停的歌曲。
+            page.runJavaScript("action('chime');")
+            QTimer.singleShot(700, after_chime)
+
+        def after_chime():
+            check("独立音效真实解码并播放", bridge.chime_player is not None
+                  and bridge.chime_player.duration() > 0 and bridge.chime_player.isPlaying())
+            check("音效保持歌曲位置与暂停状态", abs(bridge.player.position() - 9500) <= 30
+                  and not bridge.player.isPlaying() and bridge.mode == "local")
+            bridge.chime_audio.setVolume(0)
+            bridge._action("chime", None)
+            check("重复触发音效从头播放", bridge.chime_player.position() <= 30)
+            QTimer.singleShot(200, after_chime_repeat)
+
+        def after_chime_repeat():
+            check("重复音效继续播放", bridge.chime_player.isPlaying())
+            bridge.chime_player.stop()
+            capture()
 
         def capture():
             check("精细跳转 9.500 秒", abs(bridge.player.position() - 9500) <= 30)

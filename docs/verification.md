@@ -154,3 +154,14 @@ Qt 检测屏幕为 **170 Hz**。真实 WebEngine 采样约 800 毫秒，最后�
 - 使用 PE 资源解析核对 EXE 中七个图标图层，PNG 内容与 `assets/icon.ico` 逐一相同；ZIP 完整性通过，包含 psutil 原生模块及许可证，不含根级用户数据、日志、缓存和测试输出，附 SHA256 校验文件。
 
 原始报告保存在 `output/ui-result.json`、`output/smoke-result.json` 和 `output/client-launch-result.json`；重启确认和恢复连接截图保存在 `output/client-restart-confirmation.png`、`output/client-reconnected.png`。这些临时验收产物不进入源码和 Release 下载包。
+
+## 2026-10-06 · 0.2.1 快捷键与焦点
+
+- 62 项离线单元测试、49 项真实 Qt WebEngine 界面检查通过，JavaScript 错误为零。
+- 新增 `scripts/verify_shortcuts.py`，使用 Qt Test 向真实 WebEngine 发送按下 / 松开事件。覆盖词典开关、跟随下拉框、播放按钮、字号滑块焦点下的空格，确认只提交一次播放切换且不改变控件值；覆盖下拉框微调和循环、Enter、Tab、弹窗开关、输入框空格与修饰键。
+- 界面检查补充长按空格取消默认行为、输入法组合与 contenteditable 输入保护。原有歌词跟随、定位、版本、字词高亮及紧凑布局回归继续通过。
+- 源码入口原有 8 项本地播放器验收通过，包括解码、注音译文、点击歌词后播放、变速、常规循环、100 毫秒循环和定位。测试不重启或控制网易云。
+
+- 0.2.1 Windows x64 便携版构建成功，直接运行打包 EXE 的原有 8 项播放器验收通过，前端无脚本错误。ZIP 完整性、界面资源与源码一致性检查通过；不包含根级用户数据、缓存、日志或测试报告，附 SHA256 校验文件。
+
+原始报告位于 `output/shortcuts-result.json`、`output/ui-result.json` 和 `output/smoke-result.json`，不进入源码或下载包。

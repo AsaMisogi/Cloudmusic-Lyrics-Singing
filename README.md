@@ -9,7 +9,7 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 
 ## 下载与启动
 
-1. 在 [Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.2.0-windows-x64.zip`。
+1. 在 [Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.2.1-windows-x64.zip`。
 2. 完整解压到有写入权限的文件夹，例如 `D:\Utatomo`。不要在压缩包内直接运行。
 3. 双击 `Utatomo.exe`。便携版包含 Python、Qt 与离线注音词典，无需另行安装 Python。
 
@@ -89,6 +89,8 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 | 调整字号 | 顶部字号滑块 |
 | 恢复歌词跟随 | 「回到当前歌词」 |
 
+快捷键在主界面内固定对应上表操作，点击按钮、开关、滑块或下拉框后仍然有效；长按空格只切换一次播放状态。文字输入、输入法组合及弹窗内保留正常键盘操作。Enter 可操作当前焦点控件，Tab 可切换焦点。
+
 浏览其他歌词时默认停留在当前位置，设置中可启用 4 秒后自动返回。本地循环最短为 0.1 秒，Qt 支持时变速保留音高。
 
 ## 注音与歌词说明
@@ -129,6 +131,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap.ps1
 .venv/Scripts/python.exe -m unittest discover -s tests -v
 .venv/Scripts/python.exe main.py --smoke-test
 .venv/Scripts/python.exe scripts/verify_ui.py
+.venv/Scripts/python.exe scripts/verify_shortcuts.py
 
 # 经授权后验收真实网易云重启连接（会中断播放，结束后尽量恢复同曲状态）
 .venv/Scripts/python.exe scripts/verify_client_launch.py --restart-client
