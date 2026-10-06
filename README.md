@@ -7,6 +7,8 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 
 不保证注音百分百准确，但大部分是能识别出来的，识别不出的或者识别错误的部分支持手动修正。
 
+工具连接网易云客户端后，在网易云里切歌，会自动同步到工具，工具里的播放也会和网易云同步。
+
 
 作者：[朝禊ASOGI](https://space.bilibili.com/315312) · [GitHub 项目与反馈](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing)
 
