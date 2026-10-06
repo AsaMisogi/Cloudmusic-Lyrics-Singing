@@ -165,6 +165,42 @@
   editor.dispatchEvent(new KeyboardEvent('keydown', {code:'Space',key:' ',bubbles:true,cancelable:true}));
   check('可编辑内容正常接收空格', actions.length === countBefore);
   editor.remove();
+  // 更新功能通过真实 Chromium DOM 验收，网络结果用固定事件代替，不打开浏览器。
+  onEvent('appVersion', {version:'0.3.0'});
+  check('当前版本来自后端', $('appVersion').textContent==='v0.3.0' && $('sidebarVersion').textContent.includes('0.3.0'));
+  $('github').click();
+  check('GitHub 入口提交固定操作', actions.at(-1)?.[0]==='github');
+  $('toolsDialog').showModal();
+  $('checkUpdate').click();
+  check('设置提供手动更新入口', actions.at(-1)?.[0]==='checkUpdate');
+  onEvent('updateStatus', {busy:true});
+  const updateCount=actions.length; $('checkUpdate').click();
+  check('检查中禁用按钮并避免重复请求', $('checkUpdate').disabled && actions.length===updateCount && $('checkUpdate').textContent==='检查中…');
+  onEvent('updateStatus', {busy:false});
+  onEvent('updateResult', {status:'current',current:'0.3.0',version:'0.3.0',manual:true});
+  check('无更新显示版本结果且恢复按钮', !$('checkUpdate').disabled && $('updateFeedback').textContent.includes('0.3.0') && !$('updateDialog').open);
+  onEvent('updateResult', {status:'error',message:'网络不可用，请重试。',manual:true});
+  check('手动失败显示原因并允许重试', $('updateFeedback').textContent.includes('网络不可用') && !$('checkUpdate').disabled);
+  $('releasePage').click();
+  check('失败时仍可查看发布页', actions.at(-1)?.[0]==='releases');
+  const available={status:'available',current:'0.3.0',version:'0.4.0',manual:true};
+  onEvent('updateResult', available);
+  check('手动发现新版本从设置切换到更新弹窗', !$('toolsDialog').open && $('updateDialog').open && $('updateDescription').textContent.includes('0.4.0'));
+  const laterCount=actions.length; $('laterUpdate').click();
+  check('稍后更新不打开浏览器', !$('updateDialog').open && actions.length===laterCount);
+  $('clientPathDialog').showModal();
+  onEvent('updateResult', {...available,manual:false});
+  check('自动提示不会覆盖路径引导', $('clientPathDialog').open && !$('updateDialog').open);
+  $('clientPathDialog').close(); await wait(30);
+  check('引导关闭后自动显示更新', $('updateDialog').open);
+  $('downloadUpdate').click();
+  check('下载按钮只请求后端打开 Release', !$('updateDialog').open && actions.at(-1)?.[0]==='openUpdate' && actions.at(-1)?.[1]===null);
+  $('helpDialog').showModal(); onEvent('updateResult', {...available,manual:false});
+  check('自动提示等待其他弹窗关闭', !$('updateDialog').open);
+  $('helpDialog').close(); await wait(30);
+  check('自动提示显示当前和最新版本', $('updateDialog').open && $('updateDescription').textContent.includes('0.3.0') && $('updateDescription').textContent.includes('0.4.0'));
+  $('updateDialog').close();
+  check('最小窗口 GitHub 入口可见', $('github').getBoundingClientRect().bottom<=innerHeight);
   // 直接采样 rAF 间隔，以证据确认是否仍被引擎锁在 60 FPS。
   let stamps = [];
   await new Promise(resolve => {

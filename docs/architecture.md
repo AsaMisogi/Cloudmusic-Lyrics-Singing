@@ -28,6 +28,7 @@ utatomo/lyrics.py           LRC / YRC / 增强 LRC 解析、译文对齐
 utatomo/language.py         分词、假名、IPA、用户注音覆盖
 utatomo/readings.py         罗马音转假名、原文假名锚点与词边界对齐
 utatomo/services.py         网易云资源、词典、翻译、文件缓存
+utatomo/updates.py          GitHub 正式 Release 检查、版本比较与固定仓库跳转地址
 web/index.html              语义化界面与对话框
 web/style.css               设计变量、布局、适配、可访问性焦点
 web/app.js                  状态快照、歌词渲染、键盘与播放交互
@@ -129,3 +130,12 @@ BAT 同步调用 Python，后端和 Qt 主窗口属于同一个进程。Qt 退�
 ## 主界面快捷键分派（0.2.1）
 
 `web/app.js` 在 document 捕获阶段处理已绑定快捷键，取消默认行为与后续传播，避免控件焦点引起播放键变成开关、选项或滑块操作。空格 keyup 同样取消原生激活。未绑定键保留控件交互；文本输入、contenteditable、输入法组合和模态弹窗不拦截。方向键允许连续操作，播放和循环切换忽略自动重复事件。
+
+## 应用更新（0.3.0）
+
+- 使用 [GitHub Latest Release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)，匿名 HTTPS 读取仓库维护者指定的最新正式版。响应必须为 200、JSON 对象，且 draft / prerelease 均为 false。正式标签使用可选 v 前缀及三段数字，与当前版本按整数元组比较；不把日期、标签排序或字符串大小当成版本新旧。
+- 请求使用现有 requests 依赖，连接 / 读取超时分别为 3.05 / 7 秒，保留默认 TLS 校验，不跟随重定向，不自动重试。403 / 429、404、其他 HTTP 错误、离线和无效响应均返回失败，不冒充最新版本；下次启动或手动操作可以重试。公共 API 限流时可通过发布页访问下载。
+- 独立单线程 update_pool 复用已有后台任务与 Qt 信号回主线程机制；不进入歌曲 pending 队列、不携带歌曲 generation，因此切歌不会取消更新。update_busy 合并重复检查，手动加入正在进行的启动检查时提升为完整反馈。退出时取消排队任务，晚到结果不更新界面。
+- WebChannel initialize 完成后每个进程自动检查一次；无更新或失败只结束忙状态并记录错误日志，发现新版才发送提示。手动检查始终反馈结果。--smoke-test 跳过自动联网，以保持播放器回归稳定；专用 verify_updates.py 用临时数据、固定 HTTP 响应、真实桥接和工作线程单独覆盖更新链路。
+- 前端从后端读取当前版本，侧栏和设置共用 __version__；发布时同步 pyproject.toml、uv.lock 与 __init__.py。更新提示等待路径引导或其他模态窗口关闭，避免抢占焦点；手动检查发现新版时关闭设置再提示，Esc / 关闭 / 稍后均不触发浏览器。
+- GitHub 入口和发布页固定为本仓库地址，特定版本页仅由已经验证的标签构造；不使用响应 html_url 或前端输入的 URL。下载按钮调用 QDesktopServices.openUrl，启动失败给出提示；没有自动下载、执行、覆盖文件或上传个人数据。升级按 README 完整解压并迁移 data/，保留新包依赖。

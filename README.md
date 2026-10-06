@@ -2,14 +2,14 @@
 
 Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌词，也可以打开本地音频练唱；原文、日语假名或英语音标、中文译文在同一窗口显示。
 
-作者：[朝禊ASOGI](https://space.bilibili.com/315312) 
+作者：[朝禊ASOGI](https://space.bilibili.com/315312) · [GitHub 项目与反馈](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing)
 
 注：该项目由AI辅助完成。
 
 
 ## 下载与启动
 
-1. 在 [Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.2.1-windows-x64.zip`。
+1. 在 [Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.3.0-windows-x64.zip`。
 2. 完整解压到有写入权限的文件夹，例如 `D:\Utatomo`。不要在压缩包内直接运行。
 3. 双击 `Utatomo.exe`。便携版包含 Python、Qt 与离线注音词典，无需另行安装 Python。
 
@@ -28,6 +28,7 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 - 点击词汇查询日汉或英汉释义；缺少中文译文时可手动补充机译。
 - 调整字号、隐藏注音或译文、切换歌词跟随方式，自动保存显示偏好。
 - 自动识别并保存网易云安装路径；连接时可确认重启正在运行的客户端。
+- 启动自动检查 GitHub 正式版本，设置中可手动检查更新；侧栏可打开 GitHub 项目。
 - 原创音符与歌词图标，程序文件、窗口和任务栏使用同一套多尺寸图标。
 
 ## 界面示例
@@ -114,7 +115,15 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 | `data/settings.json` | 已确认的网易云安装目录 |
 | `data/logs/utatomo.log` | 运行与错误日志 |
 
-歌曲搜索、歌词与封面从网易云获取；词典查询使用有道，补充机译使用 Google / MyMemory。首次请求需要联网，已缓存的部分内容可离线使用，工具不上传音频文件。退出程序后删除 `data/cache/` 可清理内容缓存；更新时保留 `data/` 可保留个人数据。
+启动和手动更新检查访问 GitHub；歌曲搜索、歌词与封面从网易云获取；词典查询使用有道，补充机译使用 Google / MyMemory。首次请求需要联网，已缓存的部分内容可离线使用，工具不上传音频文件。退出程序后删除 `data/cache/` 可清理内容缓存；更新时保留 `data/` 可保留个人数据。
+
+## 检查更新
+
+每次打开工具，后台自动检查一次 GitHub 最新正式 Release；发现更新后弹窗显示当前和最新版本，点击「前往 GitHub 下载」会在系统浏览器打开对应发布页。「稍后再说」、关闭或 Esc 均保留当前程序，下次启动仍会检查。首次路径设置或其他弹窗打开时，更新提示等待其关闭后出现。
+
+在「设置 → 应用更新」可查看当前版本并点击「检查更新」。检查中禁用按钮，完成后显示是否需要更新；网络失败、请求限流或发布信息异常时显示原因，可重试或点击「查看 GitHub 发布页」。启动检查无更新或失败时不弹窗，不影响歌词与本地练唱。
+
+检查只访问 GitHub 公开发布接口，不要求 GitHub 登录，不上传歌曲、歌词或本地设置；不检查预发布和仅有标签的版本，不自动下载安装。升级时退出旧程序，把新包完整解压到新目录，再复制原 `data/` 文件夹；保留新包的 `_internal`，不要混用旧依赖。
 
 ## 从源码运行与打包
 
@@ -132,6 +141,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap.ps1
 .venv/Scripts/python.exe main.py --smoke-test
 .venv/Scripts/python.exe scripts/verify_ui.py
 .venv/Scripts/python.exe scripts/verify_shortcuts.py
+.venv/Scripts/python.exe scripts/verify_updates.py
 
 # 经授权后验收真实网易云重启连接（会中断播放，结束后尽量恢复同曲状态）
 .venv/Scripts/python.exe scripts/verify_client_launch.py --restart-client

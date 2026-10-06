@@ -419,8 +419,41 @@ function showSearch(data) {
   }
   if (!$("searchDialog").open) $("searchDialog").showModal();
 }
+let pendingUpdate = null;
+function showPendingUpdate() {
+  // 启动更新结果可能先于路径引导完成；等已有弹窗关闭后再提示，避免叠加焦点。
+  if (!pendingUpdate || document.querySelector("dialog[open]")) return;
+  const data = pendingUpdate;
+  pendingUpdate = null;
+  $("updateDescription").textContent = `当前版本 ${data.current}，最新正式版本 ${data.version}。是否前往下载更新？`;
+  $("updateDialog").showModal();
+}
+document.querySelectorAll("dialog").forEach(dialog => {
+  dialog.addEventListener("close", () => setTimeout(showPendingUpdate, 0));
+});
 function onEvent(kind, data) {
   if (kind === "mode") setMode(data.mode);
+  else if (kind === "appVersion") {
+    $("appVersion").textContent = `v${data.version}`;
+    $("sidebarVersion").textContent = `咏伴 ${data.version} · 让语言在歌声里熟悉`;
+  } else if (kind === "updateStatus") {
+    $("checkUpdate").disabled = !!data.busy;
+    $("checkUpdate").textContent = data.busy ? "检查中…" : "检查更新";
+    if (data.busy) $("updateFeedback").textContent = "正在检查 GitHub 正式版本…";
+    else $("updateFeedback").textContent = "检查已完成。每次启动会自动检查正式版本。";
+  } else if (kind === "updateResult") {
+    if (data.status === "available") {
+      $("updateFeedback").textContent = `发现新版本 ${data.version}（当前 ${data.current}）。`;
+      pendingUpdate = data;
+      // 手动检查从设置发起时直接转入更新提示；其他弹窗仍等待正常关闭。
+      if (data.manual && $("toolsDialog").open) $("toolsDialog").close();
+      showPendingUpdate();
+    } else {
+      const message = data.status === "current" ? `当前版本 ${data.current} 无需更新（GitHub 正式版本：${data.version}）。` : data.message;
+      $("updateFeedback").textContent = message;
+      if (!$("toolsDialog").open) toast(message, data.status === "error");
+    }
+  }
   else if (kind === "clientSettings") {
     clientDirectory = data.directory || "";
     $("clientDirectorySummary").textContent = clientDirectory || "尚未设置";
@@ -615,6 +648,14 @@ $("localMode").onclick = () => action("mode", "local");
 $("openAudio").onclick = $("emptyOpen").onclick = () => action("openAudio");
 $("demoButton").onclick = () => action("demo");
 $("author").onclick = () => action("author");
+$("github").onclick = () => action("github");
+$("checkUpdate").onclick = () => action("checkUpdate");
+$("releasePage").onclick = () => action("releases");
+$("laterUpdate").onclick = () => $("updateDialog").close();
+$("downloadUpdate").onclick = () => {
+  $("updateDialog").close();
+  action("openUpdate");
+};
 $("connectCloud").onclick = () => action("connectCloud");
 $("play").onclick = () => action("toggle");
 $("previousLine").onclick = () => goLine(-1);

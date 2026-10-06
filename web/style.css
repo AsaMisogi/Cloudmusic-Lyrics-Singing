@@ -1208,6 +1208,11 @@ rt { color: #4d5d75; font-size: .52em; font-weight: 550; line-height: 1.4; paddi
 .sidebar-bottom { padding: 8px 5px 0; }
 .author { margin-top: 5px; padding: 8px 0 5px; }
 .setting-row input[type="checkbox"] { flex: 0 0 auto; width: 18px; height: 18px; margin-left: auto; accent-color: var(--green); }
+.app-update { border-bottom: 1px solid var(--line); margin-bottom: 12px; padding-bottom: 12px; }
+.app-update .setting-row strong { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.app-update p, #updateDialog p { line-height: 1.7; }
+#updateDialog { max-width: 500px; }
+#github { margin-top: 0; }
 .setting-row > span:first-child { color: var(--ink); font-size: 13px; }
 /* 小窗口先缩小封面与装饰留白，不隐藏操作，也不通过裁切掩盖溢出。 */
 @media (max-height: 740px) {

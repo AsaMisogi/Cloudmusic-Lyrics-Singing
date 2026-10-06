@@ -95,7 +95,8 @@
           <svg><use href="#i-help" /></svg>使用指南与快捷键</button
         ><button id="author" class="author">
           由 @朝禊ASOGI 制作 <span>↗</span></button
-        ><span class="version">咏伴 0.2.1 · 让语言在歌声里熟悉</span>
+        ><button id="github" class="author" title="在系统浏览器打开项目源码与反馈页">GitHub 项目 <span>↗</span></button>
+        <span id="sidebarVersion" class="version">咏伴 · 让语言在歌声里熟悉</span>
       </div>
     </aside>
     <main>
@@ -334,6 +335,11 @@
         <h2>全局设置与歌词工具</h2>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
+      <section class="app-update" aria-labelledby="updateSettingTitle">
+        <div class="setting-row"><strong id="updateSettingTitle">应用更新 <span id="appVersion" class="muted"></span></strong><button id="checkUpdate" class="outline-button">检查更新</button></div>
+        <p id="updateFeedback" class="muted" role="status" aria-live="polite">每次启动自动检查正式版本，有更新时提示前往 GitHub 下载。</p>
+        <button id="releasePage" class="text-button">查看 GitHub 发布页 ↗</button>
+      </section>
       <section class="client-setting" aria-labelledby="clientSettingTitle">
         <div class="setting-row"><strong id="clientSettingTitle">网易云音乐路径</strong><button id="editClientPath" class="outline-button">更改路径</button></div>
         <p id="clientDirectorySummary" class="client-directory">尚未设置</p>
@@ -385,6 +391,12 @@
         按住 Shift 再按 ← / →，以 10 毫秒微调。普通 LRC
         的行内着色按时间估算；YRC 使用原始逐字时间。
       </p>
+    </dialog>
+    <dialog id="updateDialog" aria-labelledby="updateTitle" aria-describedby="updateDescription">
+      <div class="modal-title"><h2 id="updateTitle">发现新版本</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
+      <p id="updateDescription"></p>
+      <p class="muted">将在系统浏览器打开 GitHub 发布页。下载后完整解压新包，保留原 data/ 文件夹以沿用个人设置和注音修正。</p>
+      <div class="dialog-actions"><button id="laterUpdate" autofocus>稍后再说</button><button id="downloadUpdate" class="primary-button">前往 GitHub 下载 ↗</button></div>
     </dialog>
     <dialog id="clientPathDialog" aria-labelledby="clientPathTitle" aria-describedby="clientPathDescription">
       <form id="clientPathForm">
@@ -459,7 +471,7 @@
         <h3>网络与退出</h3>
         <p>
           歌词来自网易云，中文词义来自有道；点击“补充中文机译”才会把缺少译文的歌词发送给
-          Google 翻译；不可用时使用 MyMemory。关闭本窗口或日志窗口即可退出工具。
+          Google 翻译；不可用时使用 MyMemory。启动及手动检查更新会访问 GitHub 正式发布接口。关闭本窗口或日志窗口即可退出工具。
         </p>
       </div>
     </dialog>

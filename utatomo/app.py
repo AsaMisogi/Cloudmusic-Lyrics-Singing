@@ -43,6 +43,7 @@ from .media import CloudMedia
 from .services import Services
 from .matching import rank_songs, normalize
 from . import __version__
+from .updates import check_update, REPOSITORY_URL, RELEASES_URL
 from .client_launcher import ClientSettings, prepare_client, launch_client
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -107,6 +108,15 @@ class Bridge(QObject):
         self.launch_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="client-launch"
         )
+        # 更新属于应用级任务，使用独立队列，不受切歌取消和歌词请求拥塞影响。
+        self.update_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="update"
+        )
+        self.update_started = False
+        self.update_busy = False
+        self.update_manual = False
+        self.update_url = ""
+        self.closing = False
         self.annotator = None
         self.pending = []
         self.services = Services(DATA)
@@ -145,7 +155,7 @@ class Bridge(QObject):
         """工作线程只产出数据；Qt 信号将处理重新送回主线程。"""
         future = pool.submit(function)
         # 客户端启动不属于歌曲请求；切歌不能取消尚在排队的启动或重启。
-        if pool is not self.launch_pool:
+        if pool not in (self.launch_pool, self.update_pool):
             self.pending = [item for item in self.pending if not item.done()]
             self.pending.append(future)
 
@@ -200,6 +210,35 @@ class Bridge(QObject):
         if self.lines:
             self.send("lyrics", {"lines": self.lines})
         LOG.info("界面已连接；数据目录：%s", DATA)
+        self.send("appVersion", {"version": __version__})
+        # WebChannel 已就绪再检查，保证结果可以送达；一个进程只自动检查一次。
+        if not self.update_started and "--smoke-test" not in sys.argv:
+            self.update_started = True
+            self._check_update(manual=False)
+
+    def _check_update(self, manual=True):
+        """合并重复点击；手动加入启动检查时，仍显示这次检查的完整结果。"""
+        if self.closing:
+            return
+        self.update_manual = self.update_manual or manual
+        if self.update_busy:
+            return
+        self.update_busy = True
+        self.send("updateStatus", {"busy": True})
+        self._work(self.update_pool, "update", check_update)
+
+    def _finish_update(self, data):
+        if self.closing:
+            return
+        self.update_busy = False
+        manual, self.update_manual = self.update_manual, False
+        self.update_url = data.get("url", "") if data["status"] == "available" else ""
+        self.send("updateStatus", {"busy": False})
+        if data["status"] == "error":
+            LOG.warning("检查更新：%s", data["message"])
+        # 自动检查只在发现更新时打扰用户；手动检查始终给出成功或失败反馈。
+        if manual or data["status"] == "available":
+            self.send("updateResult", {**data, "manual": manual})
 
     @Slot(str, str)
     def action(self, name, raw):
@@ -437,6 +476,15 @@ class Bridge(QObject):
             self._open_audio(ROOT / "samples" / "practice.wav")
         elif name == "author":
             QDesktopServices.openUrl(QUrl("https://space.bilibili.com/315312"))
+        elif name == "github":
+            self._open_project_url(REPOSITORY_URL)
+        elif name == "checkUpdate":
+            self._check_update()
+        elif name == "openUpdate":
+            # 不接受前端传来的 URL，只打开本次检查得到的项目 Release。
+            self._open_project_url(self.update_url or RELEASES_URL)
+        elif name == "releases":
+            self._open_project_url(RELEASES_URL)
         elif name == "dictionaryWeb":
             from urllib.parse import quote
 
@@ -652,7 +700,9 @@ class Bridge(QObject):
             ):
                 return
             task, data, extra = payload["kind"], payload["data"], payload["extra"] or {}
-            if task == "clientPrepare":
+            if task == "update":
+                self._finish_update(data)
+            elif task == "clientPrepare":
                 directory = str(data["exe"].parent)
                 if data["running"]:
                     self._confirm_client_restart(directory)
@@ -671,6 +721,9 @@ class Bridge(QObject):
                     self.metadata["cover"] = data
                     self.send("cover", {"cover": data})
             elif task == "failure":
+                if data.get("task") == "update":
+                    self._finish_update({"status": "error", "message": "检查更新未完成，请稍后重试。"})
+                    return
                 if data.get("task") in ("clientPrepare", "clientLaunch"):
                     self._finish_client_connection()
                 if data.get("task") == "downloaded" and extra.get("automatic") and self.auto_candidates:
@@ -814,7 +867,13 @@ class Bridge(QObject):
         self.chime_player.stop()
         self.chime_player.play()
 
+    def _open_project_url(self, url):
+        """系统浏览器启动失败时保留可理解的反馈，不将网页载入歌词窗口。"""
+        if not QDesktopServices.openUrl(QUrl(url)):
+            self.send("error", {"message": "无法打开系统浏览器，请手动访问：" + url})
+
     def close(self):
+        self.closing = True
         self.timer.stop()
         self.client_timer.stop()
         self.player.stop()
@@ -823,6 +882,7 @@ class Bridge(QObject):
         self.cloud.close()
         self.language_pool.shutdown(wait=False, cancel_futures=True)
         self.network_pool.shutdown(wait=False, cancel_futures=True)
+        self.update_pool.shutdown(wait=False, cancel_futures=True)
         # 已确认重启必须完成「关闭 → 启动」，不能因主程序退出只执行前半步。
         self.launch_pool.shutdown(wait=True, cancel_futures=True)
 
