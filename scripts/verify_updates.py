@@ -72,6 +72,33 @@ def main():
 
         def finish():
             checks.append({"check": "启动一次加三次手动请求无额外重复", "passed": get.call_count == 4})
+            # 经真实语言线程和桥接产出罗马音，继续验证新显示偏好重载后的行为。
+            bridge._work(bridge.language_pool, "annotated", lambda: bridge._enrich([
+                {"start": 0, "end": 5000, "text": "明日へ光を追いかけて", "pronunciation": "a su e hi ka ri wo o i ka ke te", "translation": "向着明天追寻光芒", "timing": "line", "words": []},
+                {"start": 5000, "end": 10000, "text": "コーヒーを飲んで sing along", "translation": "喝杯咖啡，一起唱", "timing": "line", "words": []},
+            ], "roman-demo"))
+            QTimer.singleShot(700, romanized)
+
+        def romanized():
+            page.runJavaScript("$('toolsDialog').close(); $('romajiToggle').click();")
+            QTimer.singleShot(100, lambda: check("真实语言线程的特殊读音转为罗马音", "state.romaji && state.lines[0].tokens[0].reading==='あす' && state.lines[0].tokens[0].romaji==='asu' && lyricRows[0].querySelector('rt').textContent==='asu'", reload_preferences))
+
+        def reload_preferences():
+            view.grab().save(str(output / "romaji-display.png"))
+            # 同一个离线 profile 重新载入，沿用 initialize 的歌词快照。
+            page.loadFinished.disconnect()
+            page.loadFinished.connect(lambda ok: QTimer.singleShot(400, after_reload) if ok else app.exit(2))
+            view.reload()
+
+        def after_reload():
+            check("重载保留罗马音偏好且新歌词仍按偏好显示", "state.romaji && $('romajiToggle').checked && lyricRows[0].querySelector('rt').textContent==='asu'", disable_romaji)
+
+        def disable_romaji():
+            page.runJavaScript("$('romajiToggle').click();")
+            QTimer.singleShot(100, lambda: check("关闭后真实歌词恢复假名且无额外更新请求", "!state.romaji && lyricRows[0].querySelector('rt').textContent==='あす'", final_report))
+
+        def final_report():
+            checks.append({"check": "界面重载不重复自动检查更新", "passed": get.call_count == 4})
             page.runJavaScript("JSON.stringify(window.__errors)", report)
 
         def report(raw):

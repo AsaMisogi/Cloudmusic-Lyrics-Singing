@@ -192,6 +192,10 @@ class Annotator:
                     "lemma": lemma,
                     "language": "ja",
                     "pos": getattr(feature, "pos1", "") or "",
+                    # 助词的写法和发音不同（は→わ、へ→え、を→お）。
+                    # 保留 UniDic 上下文判定的发音，仅供纯假名词的罗马音显示。
+                    "kanaPronunciation": hiragana(getattr(feature, "pron", "") or "")
+                    if getattr(feature, "pos1", "") == "助詞" else "",
                     "source": "用户校正" if surface in self.overrides else source,
                 }
             )
@@ -222,6 +226,15 @@ class Annotator:
                 for m in ENGLISH.finditer(text)
             ]
         return tokens
+
+    @lru_cache(maxsize=4096)
+    def romanize(self, reading: str) -> str:
+        """沿用离线 pykakasi 的 Hepburn 转写；缓存按最终读音而非原文索引。
+
+        先应用歌曲注音与用户修正再转写，避免把特殊唱法重新按汉字猜读。
+        长音保留库输出的元音拼写（如 gakkou / koohii），不额外猜测唱法。
+        """
+        return "".join(item["hepburn"] for item in self.kakasi.convert(reading))
 
     def enrich(self, lines: list[dict], scope="") -> list[dict]:
         for line in lines:
@@ -267,6 +280,16 @@ class Annotator:
                 token["readingCandidates"] = candidates
                 token["readingConflict"] = (len({phonetic(c["reading"]) for c in candidates}) > 1
                                               and token["source"] == "歌曲罗马音 / 假名参考")
+                # 罗马音是额外的显示字段，原始假名及修正依据保持完整。
+                # 纯假名词原本无需 ruby；罗马音模式为这类词也提供拉丁字母注音。
+                kana_text = ""
+                if not HAN.search(token["text"]) and re.search(r"[ぁ-ゖァ-ヶ]", token["text"]):
+                    kana_text = token.get("kanaPronunciation") or token["text"]
+                roman_reading = token["reading"] or kana_text
+                token["romaji"] = (
+                    self.romanize(roman_reading)
+                    if token["language"] == "ja" and roman_reading else ""
+                )
                 cursor += len(token["text"])
             line["tokens"] = tokens
             line["readingSource"] = "song" if readings else "dictionary"

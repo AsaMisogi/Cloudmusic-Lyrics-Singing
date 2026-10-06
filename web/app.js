@@ -26,6 +26,7 @@ const state = {
   scrollTarget: null,
   pendingSeek: null,
   dict: false,
+  romaji: false,
   token: null,
   loop: null,
   a: null,
@@ -169,7 +170,7 @@ function showWord(token) {
   $("dictContent").hidden = false;
   $("dictWord").textContent = token.text;
   $("dictReading").textContent =
-    token.reading || (token.language === "ja" ? token.text : "暂无词典音标");
+    (state.romaji && token.language === "ja" ? token.romaji : "") || token.reading || (token.language === "ja" ? token.text : "暂无词典音标");
   $("dictPos").textContent = token.pos || "词汇";
   $("dictDefinitions").textContent = "正在查询中文释义…";
   $("dictSource").textContent = token.source;
@@ -204,25 +205,9 @@ function renderLyrics() {
       if (token.reading) span.title = `${token.reading} · ${token.source || "自动注音"}` +
         (token.readingConflict ? "\n读音有分歧，词典模式中可比较并修正：" +
           token.readingCandidates.map(c=>`${c.reading}（${c.source}）`).join(" / ") : "");
-      // 将日语词尾已有的假名移出 ruby，注音准确落在汉字上方。
-      // 词汇边界仍保持完整，点击「新しい」会查询同一个词。
-      let partStart = Number(span.dataset.start);
-      for (const part of rubyParts(token)) {
-        const base = document.createElement("span");
-        base.className = "token-base";
-        base.dataset.start = partStart;
-        partStart += part.text.length;
-        base.dataset.end = partStart;
-        base.textContent = part.text;
-        if (part.reading) {
-          const ruby = document.createElement("ruby");
-          ruby.append(base);
-          const rt = document.createElement("rt");
-          rt.textContent = part.reading;
-          ruby.append(rt);
-          span.append(ruby);
-        } else span.append(base);
-      }
+      // 保留词汇对象与点击边界；切换显示时只重建词内 ruby，不重载歌词或播放器。
+      span.lyricToken = token;
+      renderTokenReading(span, token);
       span.addEventListener("click", (e) => {
         if (state.dict && !e.shiftKey && token.language) {
           e.stopPropagation();
@@ -290,6 +275,43 @@ function rubyParts(token) {
   split(0, 0, []);
   // 内部假名也作为锚点：逃(に)げ出(だ)し。熟字训或边界歧义保留整词。
   return solutions.length === 1 ? solutions[0] : [token];
+}
+function renderTokenReading(span, token) {
+  // 罗马音按整个词的最终读音展示：不在假名锚点处拆开促音、拗音等组合。
+  // 默认模式仍沿用原有汉字分段 ruby；英语继续展示原来的 IPA。
+  const romanized = state.romaji && token.language === "ja" && !!token.romaji;
+  const parts = romanized ? [{text: token.text, reading: token.romaji}] : rubyParts(token);
+  span.classList.toggle("has-reading", !!token.reading || romanized);
+  span.replaceChildren();
+  let partStart = Number(span.dataset.start);
+  for (const part of parts) {
+    const base = document.createElement("span");
+    base.className = "token-base";
+    base.dataset.start = partStart;
+    partStart += part.text.length;
+    base.dataset.end = partStart;
+    base.textContent = part.text;
+    if (part.reading) {
+      const ruby = document.createElement("ruby"), rt = document.createElement("rt");
+      rt.textContent = part.reading;
+      ruby.append(base, rt);
+      span.append(ruby);
+    } else span.append(base);
+  }
+}
+function changeRomaji() {
+  state.romaji = $("romajiToggle").checked;
+  // 不调用 renderLyrics，保留当前焦点、手动浏览暂停、循环和歌词行对象。
+  document.querySelectorAll(".lyric-original .token").forEach(span => {
+    if (span.lyricToken.language === "ja") renderTokenReading(span, span.lyricToken);
+  });
+  if (state.token?.language === "ja") $("dictReading").textContent =
+    (state.romaji ? state.token.romaji : "") || state.token.reading || state.token.text;
+  const row = lyricRows[state.active];
+  activeTokens = row ? Array.from(row.querySelectorAll(".token-base")) : [];
+  updateHighlight(estimatedPosition());
+  followCurrent();
+  savePreferences();
 }
 function updateHighlight(position) {
   const lyricPosition = position - state.offset,
@@ -617,6 +639,7 @@ function savePreferences() {
         ruby: $("rubyToggle").checked,
         translation: $("translationToggle").checked,
         dict: state.dict,
+        romaji: state.romaji,
         size: $("fontSize").value,
         follow: state.follow,
         followMode: state.followMode,
@@ -692,6 +715,7 @@ $("seek").addEventListener("change", () => {
 });
 $("seek").addEventListener("pointercancel", () => (state.dragging = false));
 $("rubyToggle").onchange = $("translationToggle").onchange = display;
+$("romajiToggle").onchange = changeRomaji;
 $("fontSize").oninput = display;
 $("quickFontSize").oninput = (e) => { $("fontSize").value = e.target.value; display(); };
 $("songVersion").onchange = (e) => action("selectSong", {id: e.target.value});
@@ -886,6 +910,9 @@ document.querySelector(".brand img").ondblclick = () => action("chime");
 try {
   const p = JSON.parse(localStorage.getItem("utatomo-display") || "{}");
   if (p.ruby !== undefined) $("rubyToggle").checked = p.ruby;
+  // 旧配置缺少此字段时维持默认关闭，先读完全部偏好再持久化。
+  state.romaji = p.romaji === true;
+  $("romajiToggle").checked = state.romaji;
   if (p.translation !== undefined)
     $("translationToggle").checked = p.translation;
   if (p.size) $("fontSize").value = p.size;

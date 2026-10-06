@@ -165,6 +165,36 @@
   editor.dispatchEvent(new KeyboardEvent('keydown', {code:'Space',key:' ',bubbles:true,cancelable:true}));
   check('可编辑内容正常接收空格', actions.length === countBefore);
   editor.remove();
+  // 罗马音只改变显示，保持词汇边界、当前行、逐字时间与用户校正所需的假名。
+  check('日语罗马音默认关闭', !state.romaji && !$('romajiToggle').checked);
+  const romanTokens=[{text:'逃げ出し',reading:'にげだし',romaji:'nigedashi',language:'ja',lemma:'逃げ出す'},
+    {text:'コーヒー',reading:'',romaji:'koohii',language:'ja',lemma:'コーヒー'},
+    {text:'Sing',reading:'sɪŋ',romaji:'',language:'en',lemma:'sing'}];
+  onEvent('lyrics',{lines:[{start:0,end:6000,text:'逃げ出しコーヒーSing',tokens:romanTokens,
+    timing:'word',words:[{text:'逃げ出し',start:0,end:2000},{text:'コーヒー',start:2000,end:4000},{text:'Sing',start:4000,end:6000}]}]});
+  updatePlayback({position:1000,duration:6000,playing:false,canSeek:true}); updateHighlight(1000);
+  const keptRow=lyricRows[0], englishRuby=keptRow.querySelector('.token.en ruby');
+  const readingBefore=romanTokens[0].reading, savedLoop=state.loop;
+  state.resumeFollowAt=performance.now()+60000; state.scrollTarget=null;
+  const savedResume=state.resumeFollowAt;
+  $('romajiToggle').click();
+  check('开启后日语整词和纯假名显示罗马音', [...keptRow.querySelectorAll('rt')].map(t=>t.textContent).join('|')==='nigedashi|koohii|sɪŋ');
+  check('切换不改英语音标或词汇 DOM', keptRow.querySelector('.token.en ruby')===englishRuby);
+  check('罗马音按原字符范围进行逐字高亮', Math.abs(parseFloat(keptRow.querySelector('.token-base').style.getPropertyValue('--fill'))-50)<.01);
+  check('切换保留歌词行、原始读音和循环状态', lyricRows[0]===keptRow && romanTokens[0].reading===readingBefore && state.loop===savedLoop);
+  check('切换保留手动浏览暂停且不恢复跟随', state.resumeFollowAt===savedResume && state.scrollTarget===null);
+  check('罗马音偏好持久保存', JSON.parse(localStorage.getItem('utatomo-display')).romaji===true);
+  setDictionary(true); keptRow.querySelector('.token-base').click();
+  check('罗马音模式查词仍使用完整词原形', actions.at(-1)?.[0]==='dictionary' && actions.at(-1)?.[1]?.lemma==='逃げ出す' && $('dictReading').textContent==='nigedashi');
+  $('correctButton').click();
+  check('注音修正仍编辑原始假名', $('correctReading').value==='にげだし'); $('correctDialog').close();
+  $('rubyToggle').checked=false; display();
+  check('罗马音服从注音总开关', getComputedStyle(keptRow.querySelector('rt')).display==='none');
+  $('rubyToggle').checked=true; display();
+  $('romajiToggle').click();
+  check('关闭后恢复原有假名分段和词典读音', [...keptRow.querySelectorAll('rt')].map(t=>t.textContent).join('|')==='に|だ|sɪŋ' && $('dictReading').textContent==='にげだし');
+  check('关闭状态也保存且与英文独立', JSON.parse(localStorage.getItem('utatomo-display')).romaji===false && keptRow.querySelector('.token.en ruby')===englishRuby);
+  setDictionary(false); state.resumeFollowAt=0;
   // 更新功能通过真实 Chromium DOM 验收，网络结果用固定事件代替，不打开浏览器。
   onEvent('appVersion', {version:'0.3.0'});
   check('当前版本来自后端', $('appVersion').textContent==='v0.3.0' && $('sidebarVersion').textContent.includes('0.3.0'));
