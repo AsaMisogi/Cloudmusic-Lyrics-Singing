@@ -21,6 +21,7 @@ main.py                     桌面启动入口
 utatomo/app.py              Qt 窗口、异步任务、播放控制与界面桥接
 utatomo/media.py            Windows GSMTC 读取与控制
 utatomo/client.py           本机 CDP 连接、串行请求、超时和重连
+utatomo/client_launcher.py  安装路径发现、原子配置保存、确认后的进程重启
 utatomo/client_bridge.js    网易云 3.x 播放组件适配、当前歌曲检查
 utatomo/matching.py         歌曲候选评分和歌词时间轴质量选择
 utatomo/lyrics.py           LRC / YRC / 增强 LRC 解析、译文对齐
@@ -81,7 +82,18 @@ Chromium 初始化前追加 `--disable-frame-rate-limit`；不关闭 GPU 加速�
 
 同步音频直接由网易云播放，不再从公开音频地址另取一份。歌词缓存和运行日志仅保存在项目目录。首次安装使用项目内 Python 和虚拟环境。
 
-CDP 仅接受 `127.0.0.1:9222` 或同端口 localhost 的 WebSocket 地址，只选择 `orpheus://orpheus/pub/app.html`。不跟随 HTTP 重定向，不经过系统代理。适配器只返回当前歌曲元数据、播放状态和客户端提供的本地音频路径，不读取账户凭据。调试端口本身赋予同机进程控制客户端的能力；README 说明启动与关闭方式，程序不自动杀掉网易云进程。
+CDP 仅接受 `127.0.0.1:9222` 或同端口 localhost 的 WebSocket 地址，只选择 `orpheus://orpheus/pub/app.html`。不跟随 HTTP 重定向，不经过系统代理。适配器只返回当前歌曲元数据、播放状态和客户端提供的本地音频路径，不读取账户凭据。调试端口本身赋予同机进程控制客户端的能力；README 说明启动与关闭方式。只有用户确认当前重启弹窗后，工具才允许结束安装路径匹配的网易云进程。
+
+## 客户端路径与连接流程（0.2.0）
+
+- `ClientSettings` 在 `data/settings.json` 保存 `cloudMusicDirectory`。没有成功保存记录时显示首次引导，自动发现仅预填，不代表用户已确认。旧目录失效时保留原值并提示修正，不静默切换安装。
+- 自动发现顺序为运行中的 `cloudmusic.exe`、HKCU/HKLM 两种注册表视图的 App Paths / CloudMusic 卸载记录、常见安装目录。目录和主程序路径均可输入，统一检查存在的 `cloudmusic.exe` 并保存绝对安装目录。写入使用同目录临时文件和原子替换。
+- 连接准备和重启使用独立的单线程 `launch_pool`，不被歌曲请求取消，也不阻塞 Qt 主线程。控制器持有 busy 状态和一次性确认目录，忽略重复点击；取消或 Esc 不执行任何退出操作。
+- 检查完成后、真正启动前再次枚举进程；期间新出现的客户端仍需确认。重启按进程名和完整可执行路径双重匹配；发现其他安装或无读取权限时停止并报告。
+- 先通过 Windows `WM_CLOSE` 请求退出，等待 4 秒；剩余同路径进程使用 psutil 校验进程身份后结束，再等待最多 5 秒。全部退出后才用参数列表启动同一主程序，仅开放回环 9222 端口。安装文件不被修改。
+- 只有真实 `transport=client` 播放快照到达才宣告连接成功；30 秒没有快照则报告检查建议、释放按钮，原媒体线程继续自动重连。已直连时不再重启。
+- 关闭工具时等待已确认的客户端启动任务完成，避免在客户端刚退出时中断后续启动；尚未开始的任务取消。
+- 图标以 SVG 为源，Qt 渲染器生成七个尺寸的 PNG 并组成 ICO。PyInstaller 将 ICO 嵌入 EXE，Qt 窗口也使用 ICO；Windows 任务栏身份为 `ASOGI.Utatomo`。
 
 歌词候选按当前 ID、队列、标题 / 歌手相似度、专辑和时长排序。自动获取失败最多尝试三个候选；手动选择不触发自动改选。YRC / LRC 分别配对 ytlrc / tlyric，明显残缺的 YRC 降级到完整 LRC。
 

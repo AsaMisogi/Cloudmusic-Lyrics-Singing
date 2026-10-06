@@ -1,1 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="32" fill="#245747"/><path d="M37 91C31 65 43 43 82 24C80 56 69 72 46 76C45 82 44 91 45 101" fill="#f5f2e7"/><path d="M56 92C59 79 74 72 94 70C88 91 75 98 56 96" fill="#bad0a6"/><path d="M45 88Q49 66 69 48" fill="none" stroke="#245747" stroke-width="3" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="forest" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#47745e"/><stop offset="1" stop-color="#183f35"/>
+    </linearGradient>
+    <linearGradient id="cream" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#fff9e8"/><stop offset="1" stop-color="#e7edda"/>
+    </linearGradient>
+  </defs>
+  <!-- 保留透明外缘，在浅色和深色桌面上都有清晰轮廓。 -->
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="url(#forest)"/>
+  <rect x="9" y="9" width="238" height="238" rx="57" fill="none" stroke="#a9c4ac" stroke-opacity=".24" stroke-width="2"/>
+  <!-- 歌词线与音符组成「文字伴随歌声」，小尺寸仍保留主轮廓。 -->
+  <path d="M53 94H111M53 122H96M53 150H85" fill="none" stroke="#e6edd9" stroke-width="11" stroke-linecap="round" opacity=".9"/>
+  <path d="M143 165V82C162 85 181 77 196 65V91C184 100 171 104 158 104V172" fill="url(#cream)"/>
+  <ellipse cx="136" cy="174" rx="25" ry="18" transform="rotate(-22 136 174)" fill="url(#cream)"/>
+  <!-- 暖金圆点呼应原有日光主题，避免使用缩小后无法辨认的文字。 -->
+  <circle cx="67" cy="186" r="8" fill="#e8c878"/>
+</svg>

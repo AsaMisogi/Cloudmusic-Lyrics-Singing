@@ -86,7 +86,7 @@
       <button id="practiceButton" class="primary-button practice-button">
         同步练唱
       </button>
-      <button id="connectCloud" class="outline-button" title="仅本机连接；网易云已运行时请先从托盘完整退出">连接客户端</button>
+      <button id="connectCloud" class="outline-button" title="启用本机双向同步；网易云已运行时会先询问是否重启">连接客户端</button>
       <button id="openAudio" class="outline-button">
         <svg><use href="#i-folder" /></svg>打开本地音频
       </button>
@@ -95,7 +95,7 @@
           <svg><use href="#i-help" /></svg>使用指南与快捷键</button
         ><button id="author" class="author">
           由 @朝禊ASOGI 制作 <span>↗</span></button
-        ><span class="version">咏伴 0.1 · 让语言在歌声里熟悉</span>
+        ><span class="version">咏伴 0.2.0 · 让语言在歌声里熟悉</span>
       </div>
     </aside>
     <main>
@@ -334,6 +334,11 @@
         <h2>全局设置与歌词工具</h2>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
+      <section class="client-setting" aria-labelledby="clientSettingTitle">
+        <div class="setting-row"><strong id="clientSettingTitle">网易云音乐路径</strong><button id="editClientPath" class="outline-button">更改路径</button></div>
+        <p id="clientDirectorySummary" class="client-directory">尚未设置</p>
+        <p class="muted">连接客户端时使用此目录。保存新路径后，下次连接生效。</p>
+      </section>
       <label class="setting-row"><span>点击歌词后立即播放</span><input id="playOnLyricSeek" type="checkbox" checked /></label>
       <label class="setting-row"><span>浏览其他歌词后，4 秒自动回到当前句</span><input id="resumeAfterBrowse" type="checkbox" /></label>
       <p class="muted">关闭自动返回时，手动浏览会一直停留；点击「回到当前歌词」恢复跟随。设置自动保存，重启后保持。</p>
@@ -380,6 +385,27 @@
         按住 Shift 再按 ← / →，以 10 毫秒微调。普通 LRC
         的行内着色按时间估算；YRC 使用原始逐字时间。
       </p>
+    </dialog>
+    <dialog id="clientPathDialog" aria-labelledby="clientPathTitle" aria-describedby="clientPathDescription">
+      <form id="clientPathForm">
+        <div class="modal-title"><h2 id="clientPathTitle">设置网易云音乐路径</h2></div>
+        <p id="clientPathDescription">请确认网易云音乐所在的文件夹。自动识别的目录可重新选择，也可以粘贴 cloudmusic.exe 的完整路径。</p>
+        <label for="clientPathInput">网易云音乐安装目录</label>
+        <div class="client-path-input">
+          <input id="clientPathInput" type="text" placeholder="选择包含 cloudmusic.exe 的文件夹" autocomplete="off" spellcheck="false" aria-describedby="clientPathError" />
+          <button id="browseClientPath" type="button" class="outline-button">浏览…</button>
+        </div>
+        <p id="clientPathError" class="client-path-error" role="alert" hidden></p>
+        <p class="muted">可随时在「设置 → 网易云音乐路径」修改。暂时跳过也能使用本地练唱。</p>
+        <div class="dialog-actions"><button id="cancelClientPath" type="button">暂时跳过</button><button id="saveClientPath" type="submit" class="primary-button">保存路径</button></div>
+      </form>
+    </dialog>
+    <dialog id="clientRestartDialog" aria-labelledby="clientRestartTitle" aria-describedby="clientRestartDescription">
+      <div class="modal-title"><h2 id="clientRestartTitle">重启网易云以连接？</h2></div>
+      <p id="clientRestartDescription">网易云音乐正在运行。确认后，咏伴会关闭并重新启动客户端，以启用本机双向同步。</p>
+      <p class="muted">当前播放会中断。如果客户端只缩到托盘或未响应，咏伴会结束该安装目录下的网易云后台进程。请先完成正在进行的下载或其他操作。</p>
+      <p id="clientRestartDirectory" class="client-directory"></p>
+      <div class="dialog-actions"><button id="cancelClientRestart" autofocus>取消</button><button id="confirmClientRestart" class="primary-button">重启并连接</button></div>
     </dialog>
     <dialog id="correctDialog">
       <form id="correctForm">

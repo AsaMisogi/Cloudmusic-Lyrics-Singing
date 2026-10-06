@@ -15,7 +15,6 @@ import os
 import re
 import sys
 import time
-import subprocess
 from pathlib import Path
 
 # Qt WebEngine 的部分 Windows 版本使用固定 60 Hz begin-frame 限制。
@@ -43,6 +42,8 @@ from .lyrics import align_translation, align_pronunciation, parse_lyrics, read_t
 from .media import CloudMedia
 from .services import Services
 from .matching import rank_songs, normalize
+from . import __version__
+from .client_launcher import ClientSettings, prepare_client, launch_client
 
 ROOT = Path(__file__).resolve().parent.parent
 WRITABLE_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
@@ -103,9 +104,19 @@ class Bridge(QObject):
         self.network_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=3, thread_name_prefix="network"
         )
+        self.launch_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="client-launch"
+        )
         self.annotator = None
         self.pending = []
         self.services = Services(DATA)
+        self.client_settings = ClientSettings(DATA)
+        self.client_busy = False
+        self.client_confirmation = None
+        self.client_deadline = 0
+        self.client_timer = QTimer(self)
+        self.client_timer.setInterval(500)
+        self.client_timer.timeout.connect(self._check_client_connection)
         self.incoming.connect(self._receive)
         self.player = QMediaPlayer(self)
         self.audio = QAudioOutput(self)
@@ -131,8 +142,10 @@ class Bridge(QObject):
     def _work(self, pool, kind, function, generation=None, extra=None):
         """工作线程只产出数据；Qt 信号将处理重新送回主线程。"""
         future = pool.submit(function)
-        self.pending = [item for item in self.pending if not item.done()]
-        self.pending.append(future)
+        # 客户端启动不属于歌曲请求；切歌不能取消尚在排队的启动或重启。
+        if pool is not self.launch_pool:
+            self.pending = [item for item in self.pending if not item.done()]
+            self.pending.append(future)
 
         def completed(task):
             try:
@@ -179,6 +192,8 @@ class Bridge(QObject):
         self.send("mode", {"mode": self.mode})
         self.send("track", self.metadata)
         self.send("cloud", self.cloud_state)
+        self._send_client_settings(setup=not self.client_settings.confirmed and "--smoke-test" not in sys.argv)
+        self.send("clientStatus", {"busy": self.client_busy})
         self._send_versions()
         if self.lines:
             self.send("lyrics", {"lines": self.lines})
@@ -191,7 +206,7 @@ class Bridge(QObject):
             self._action(name, value)
         except Exception as exc:
             LOG.exception("操作失败：%s", name)
-            self.send("error", {"message": str(exc)})
+            self.send("clientPathError" if name == "saveClientPath" else "error", {"message": str(exc)})
 
     def _action(self, name, value):
         if name == "mode":
@@ -329,6 +344,35 @@ class Bridge(QObject):
                 self.send("notice", {"message": "当前音频由网易云直接播放，可在下方播放、暂停、跳转和循环。独立变速练唱可打开本地音频。"})
         elif name == "connectCloud":
             self._launch_cloud()
+        elif name == "confirmClientRestart":
+            # 前端只能确认当前待处理请求，不能构造任意路径的重启操作。
+            directory = self.client_confirmation
+            if directory is None:
+                return
+            self.client_confirmation = None
+            if value is not True:
+                self._finish_client_connection()
+                return
+            self.send("busy", {"message": "正在关闭并重新启动网易云…"})
+            self._work(self.launch_pool, "clientLaunch", lambda: launch_client(directory, restart=True))
+        elif name == "saveClientPath":
+            if self.client_busy:
+                raise ValueError("客户端正在连接，请稍后修改路径。")
+            if not isinstance(value, str):
+                raise ValueError("请选择有效的网易云安装目录。")
+            self.client_settings.save(value)
+            self._send_client_settings(saved=True)
+            self.send("notice", {"message": "网易云路径已保存，下次连接时使用。"})
+        elif name == "chooseClientPath":
+            if self.client_busy:
+                return
+            # 选择目录只修改输入框，点击保存后才更改持久配置。
+            directory = QFileDialog.getExistingDirectory(
+                self.window, "选择包含 cloudmusic.exe 的网易云音乐文件夹",
+                self.client_settings.directory or str(WRITABLE_ROOT),
+            )
+            if directory:
+                self.send("clientPathSelected", {"directory": directory})
         elif name == "dictionary":
             word, language = str(value["lemma"] or value["text"]), value["language"]
             self._work(
@@ -422,29 +466,44 @@ class Bridge(QObject):
         self.send("reset", {})
 
     def _launch_cloud(self):
-        """由用户点击启动本机通道。正在运行时保留播放，提示完整退出后重开。"""
+        """串行处理一次连接请求；运行中的客户端必须等用户确认后再重启。"""
+        if self.client_busy:
+            return
         if self.cloud_state.get("transport") == "client":
             self.send("notice", {"message": "已连接客户端，可直接使用下方播放控制。"})
             return
-        flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        listing = subprocess.run(["tasklist", "/FI", "IMAGENAME eq cloudmusic.exe", "/FO", "CSV", "/NH"],
-                                 capture_output=True, timeout=3, creationflags=flags)
-        if b'cloudmusic.exe' in listing.stdout.lower():
-            raise ValueError("请先从网易云托盘菜单完整退出，再点“连接客户端”。关闭窗口可能仅缩到托盘。")
-        paths = [Path(os.environ.get(key, "")) / "NetEase/CloudMusic/cloudmusic.exe"
-                 for key in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA")]
-        exe = next((p for p in paths if p.is_file()), None)
-        if exe is None:
-            chosen, _ = QFileDialog.getOpenFileName(self.window, "选择网易云 cloudmusic.exe", "", "网易云 (cloudmusic.exe)")
-            if not chosen:
-                return
-            exe = Path(chosen)
-        startup = subprocess.STARTUPINFO()
-        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startup.wShowWindow = 0
-        subprocess.Popen([str(exe), "--remote-debugging-port=9222", "--remote-debugging-address=127.0.0.1"],
-                         cwd=str(exe.parent), startupinfo=startup)
-        self.send("notice", {"message": "正在启动网易云本机连接，选一首歌即可同步。"})
+        if not self.client_settings.confirmed:
+            self._send_client_settings(setup=True)
+            return
+        self.client_busy = True
+        self.send("clientStatus", {"busy": True})
+        self.send("busy", {"message": "正在检查网易云客户端…"})
+        directory = self.client_settings.directory
+        self._work(self.launch_pool, "clientPrepare", lambda: prepare_client(directory))
+
+    def _send_client_settings(self, setup=False, saved=False):
+        self.send("clientSettings", {"directory": self.client_settings.directory,
+                                     "setup": setup, "saved": saved})
+
+    def _confirm_client_restart(self, directory):
+        self.client_confirmation = directory
+        self.send("clientRestartRequired", {"directory": directory})
+
+    def _finish_client_connection(self):
+        self.client_timer.stop()
+        self.client_busy = False
+        self.client_confirmation = None
+        self.client_deadline = 0
+        self.send("clientStatus", {"busy": False})
+
+    def _check_client_connection(self):
+        # 接收到真实播放器快照才宣告成功；启动进程成功不等于已经双向同步。
+        if self.cloud_state.get("transport") == "client":
+            self._finish_client_connection()
+            self.send("notice", {"message": "已连接网易云客户端，可以双向同步播放进度。"})
+        elif time.monotonic() >= self.client_deadline:
+            self._finish_client_connection()
+            self.send("error", {"message": "网易云已启动，但尚未收到直连播放信息。请在网易云播放一首歌；若仍无法同步，请检查路径、客户端版本或 9222 端口是否被占用。工具会继续自动尝试连接。"})
 
     def _open_audio(self, path: Path):
         if not path.is_file():
@@ -589,11 +648,27 @@ class Bridge(QObject):
             ):
                 return
             task, data, extra = payload["kind"], payload["data"], payload["extra"] or {}
-            if task == "cover":
+            if task == "clientPrepare":
+                directory = str(data["exe"].parent)
+                if data["running"]:
+                    self._confirm_client_restart(directory)
+                else:
+                    self.send("busy", {"message": "正在启动网易云客户端…"})
+                    self._work(self.launch_pool, "clientLaunch", lambda: launch_client(directory))
+            elif task == "clientLaunch":
+                if data["confirmation"]:
+                    self._confirm_client_restart(data["directory"])
+                else:
+                    self.client_deadline = time.monotonic() + 30
+                    self.client_timer.start()
+                    self.send("busy", {"message": "网易云已启动，正在等待直连…请在客户端播放一首歌。"})
+            elif task == "cover":
                 if self.mode == "cloud" and extra.get("identity") == self.identity:
                     self.metadata["cover"] = data
                     self.send("cover", {"cover": data})
             elif task == "failure":
+                if data.get("task") in ("clientPrepare", "clientLaunch"):
+                    self._finish_client_connection()
                 if data.get("task") == "downloaded" and extra.get("automatic") and self.auto_candidates:
                     self._fetch_lyrics(str(self.auto_candidates.pop(0)["id"]), automatic=True)
                     return
@@ -719,10 +794,13 @@ class Bridge(QObject):
 
     def close(self):
         self.timer.stop()
+        self.client_timer.stop()
         self.player.stop()
         self.cloud.close()
         self.language_pool.shutdown(wait=False, cancel_futures=True)
         self.network_pool.shutdown(wait=False, cancel_futures=True)
+        # 已确认重启必须完成「关闭 → 启动」，不能因主程序退出只执行前半步。
+        self.launch_pool.shutdown(wait=True, cancel_futures=True)
 
 
 def main():
@@ -739,11 +817,15 @@ def main():
         format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
         handlers=[logging.StreamHandler(sys.stdout), log_file],
     )
-    LOG.info("咏伴 Utatomo 0.1.0 · 作者 @朝禊ASOGI")
+    LOG.info("咏伴 Utatomo %s · 作者 @朝禊ASOGI", __version__)
+    if sys.platform == "win32":
+        # 独立的任务栏身份配合窗口图标，源码启动也不会使用 Python 默认图标。
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ASOGI.Utatomo")
     app = QApplication(sys.argv)
     app.setApplicationName("Utatomo")
     app.setOrganizationName("ASOGI")
-    app.setWindowIcon(QIcon(str(ROOT / "assets" / "icon.svg")))
+    app.setWindowIcon(QIcon(str(ROOT / "assets" / "icon.ico")))
     lock = QLockFile(str(DATA / "instance.lock"))
     if not lock.tryLock(100):
         LOG.error("咏伴已经运行，请切换到现有窗口。")

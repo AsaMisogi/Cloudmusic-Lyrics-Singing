@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    # SVG 是图标源文件，每次构建同步生成可执行文件使用的多尺寸 ICO。
+    subprocess.run([sys.executable, str(ROOT / "scripts/create_icon.py")], cwd=ROOT, check=True)
     build_env = os.environ.copy()
     # Avoid collecting unrelated DLLs from tools injected into the host PATH.
     windows = Path(os.environ["SystemRoot"])

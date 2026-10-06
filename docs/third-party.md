@@ -15,6 +15,7 @@
 | PyWinRT | Windows 系统媒体会话 | [pywinrt](https://github.com/pywinrt/pywinrt)，MIT |
 | Requests | 网络请求 | [psf/requests](https://github.com/psf/requests)，Apache 2.0 |
 | websocket-client | 网易云本机 CDP 通道 | [websocket-client](https://github.com/websocket-client/websocket-client)，Apache 2.0 |
+| psutil | 精确识别网易云进程、校验进程身份并等待退出 | [giampaolo/psutil](https://github.com/giampaolo/psutil)，BSD 3-Clause |
 | uv | 项目私有依赖安装 | [astral-sh/uv](https://github.com/astral-sh/uv)，MIT / Apache 2.0 |
 
 项目源码采用 GPLv3，见根目录 `LICENSE`。Windows 便携包的 `THIRD-PARTY-LICENSES/` 包含依赖许可原文与版本清单。Qt 使用独立动态库，位于 `_internal/`，未修改其实现。源码与构建脚本在 [项目仓库](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing) 提供；第三方组件仍按各自许可分发。
@@ -32,6 +33,6 @@
 ## 原创资产
 
 - `assets/design-mockup.png`：按本项目需求，通过内置 imagegen 工具生成的界面设计稿。
-- `assets/icon.svg`、`assets/landscape.svg`：为本项目绘制的矢量图标和默认封面。
+- `assets/icon.svg`、`assets/landscape.svg`：为本项目绘制的矢量图标和默认封面。`assets/icon.ico` 由图标 SVG 渲染生成。
 - `samples/practice.lrc`、`practice.zh.lrc`：原创演示句子。
 - `samples/practice.wav`：`scripts/create_sample.py` 合成的原创提示音轨，没有使用第三方歌曲录音。

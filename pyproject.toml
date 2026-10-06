@@ -1,6 +1,6 @@
 [project]
 name = "utatomo"
-version = "0.1.0"
+version = "0.2.0"
 description = "咏伴：日英双语歌词跟唱助手"
 license = "GPL-3.0-only"
 requires-python = ">=3.12,<3.13"
@@ -16,6 +16,7 @@ dependencies = [
   "winrt-Windows.Foundation>=3,<4; sys_platform == 'win32'",
   "winrt-Windows.Foundation.Collections>=3,<4; sys_platform == 'win32'",
   "websocket-client>=1.8,<2",
+  "psutil>=7.2,<8; sys_platform == 'win32'",
 ]
 
 [tool.uv]

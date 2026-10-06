@@ -170,6 +170,16 @@ wheels = [
 ]
 
 [[package]]
+name = "psutil"
+version = "7.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/c6/d1ddf4abb55e93cebc4f2ed8b5d6dbad109ecb8d63748dd2b20ab5e57ebe/psutil-7.2.2.tar.gz", hash = "sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372", size = 493740, upload-time = "2026-01-28T18:14:54.428Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/90/e2159492b5426be0c1fef7acba807a03511f97c5f86b3caeda6ad92351a7/psutil-7.2.2-cp37-abi3-win_amd64.whl", hash = "sha256:eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988", size = 137737, upload-time = "2026-01-28T18:15:33.849Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/c7/7bb2e321574b10df20cbde462a94e2b71d05f9bbda251ef27d104668306a/psutil-7.2.2-cp37-abi3-win_arm64.whl", hash = "sha256:8c233660f575a5a89e6d4cb65d9f938126312bca76d8fe087b947b3a1aaac9ee", size = 134617, upload-time = "2026-01-28T18:15:36.514Z" },
+]
+
+[[package]]
 name = "pyinstaller"
 version = "6.22.3"
 source = { registry = "https://pypi.org/simple" }
@@ -341,11 +351,12 @@ wheels = [
 
 [[package]]
 name = "utatomo"
-version = "0.1.0"
+version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cmudict" },
     { name = "fugashi" },
+    { name = "psutil", marker = "sys_platform == 'win32'" },
     { name = "pykakasi" },
     { name = "pyside6" },
     { name = "requests" },
@@ -366,6 +377,7 @@ dev = [
 requires-dist = [
     { name = "cmudict", specifier = ">=1.1,<2" },
     { name = "fugashi", specifier = ">=1.4,<2" },
+    { name = "psutil", marker = "sys_platform == 'win32'", specifier = ">=7.2,<8" },
     { name = "pykakasi", specifier = ">=2.3,<3" },
     { name = "pyside6", specifier = ">=6.8,<6.11" },
     { name = "requests", specifier = ">=2.32,<3" },

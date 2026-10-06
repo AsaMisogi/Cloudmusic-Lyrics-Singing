@@ -859,6 +859,13 @@ dialog::backdrop {
   background: #263d3340;
   backdrop-filter: blur(4px);
 }
+.client-setting { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 12px; }
+.client-directory { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; color: var(--ink); margin: 8px 0; }
+.client-path-input { display: flex; gap: 10px; margin: 10px 0; }
+.client-path-input input { flex: 1; }
+.client-path-input button { flex-shrink: 0; }
+.client-path-error { color: #a34036; font-size: 12px; line-height: 1.7; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
 .modal-title {
   display: flex;
   justify-content: space-between;

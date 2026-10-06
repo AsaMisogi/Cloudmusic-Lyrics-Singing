@@ -421,6 +421,31 @@ function showSearch(data) {
 }
 function onEvent(kind, data) {
   if (kind === "mode") setMode(data.mode);
+  else if (kind === "clientSettings") {
+    clientDirectory = data.directory || "";
+    $("clientDirectorySummary").textContent = clientDirectory || "尚未设置";
+    if (data.saved) $("clientPathDialog").close();
+    if (data.setup) openClientPath(true);
+  } else if (kind === "clientPathSelected") {
+    $("clientPathInput").value = data.directory;
+    $("clientPathError").hidden = true;
+    $("clientPathInput").removeAttribute("aria-invalid");
+  } else if (kind === "clientPathError") {
+    $("clientPathError").textContent = data.message;
+    $("clientPathError").hidden = false;
+    $("clientPathInput").setAttribute("aria-invalid", "true");
+    $("clientPathInput").focus();
+  } else if (kind === "clientStatus") {
+    $("connectCloud").disabled = !!data.busy;
+    $("connectCloud").textContent = data.busy ? "连接中…" : "连接客户端";
+    for (const id of ["editClientPath", "browseClientPath", "saveClientPath"]) $(id).disabled = !!data.busy;
+    if (!data.busy) $("toast").hidden = true;
+  } else if (kind === "clientRestartRequired") {
+    // 用独立模态窗口说明副作用；Esc 和取消都只取消此次连接。
+    $("clientRestartDirectory").textContent = data.directory;
+    $("toast").hidden = true;
+    if (!$("clientRestartDialog").open) $("clientRestartDialog").showModal();
+  }
   else if (kind === "displayInfo") $("displayInfo").textContent =
     `显示器 ${data.refreshRate} Hz · ${data.unlimited ? "已解除固定帧率上限" : "系统默认刷新"}`;
   else if (kind === "track") {
@@ -480,7 +505,7 @@ function onEvent(kind, data) {
       updatePlayback(data);
       $("capabilityNotice").hidden = !!data.hasTimeline;
       $("capabilityNotice").textContent =
-        "Windows 接口未提供进度。请从托盘完整退出网易云，再点击左侧“连接客户端”，启用双向同步。";
+        "Windows 接口未提供进度。点击左侧“连接客户端”，确认重启网易云后启用双向同步。";
     } else {
       updatePlayback({
         playing: false,
@@ -682,6 +707,32 @@ function showCover(source) {
 $("albumCover").onerror = () => showCover("");
 $("searchButton").onclick = () => $("searchDialog").showModal();
 $("moreButton").onclick = () => $("toolsDialog").showModal();
+let clientDirectory = "";
+function openClientPath(firstRun = false) {
+  $("clientPathTitle").textContent = firstRun ? "先确认网易云音乐路径" : "更改网易云音乐路径";
+  $("cancelClientPath").textContent = firstRun ? "暂时跳过" : "取消";
+  $("clientPathInput").value = clientDirectory;
+  $("clientPathInput").removeAttribute("aria-invalid");
+  $("clientPathError").hidden = true;
+  if (!$("clientPathDialog").open) $("clientPathDialog").showModal();
+}
+$("editClientPath").onclick = () => openClientPath();
+$("browseClientPath").onclick = () => action("chooseClientPath");
+$("cancelClientPath").onclick = () => $("clientPathDialog").close();
+$("clientPathForm").onsubmit = e => {
+  e.preventDefault();
+  // 后端验证存在的主程序并原子保存；成功回执到达前保留输入和弹窗。
+  action("saveClientPath", $("clientPathInput").value);
+};
+$("confirmClientRestart").onclick = () => {
+  $("clientRestartDialog").close();
+  action("confirmClientRestart", true);
+};
+$("cancelClientRestart").onclick = () => {
+  $("clientRestartDialog").close();
+  action("confirmClientRestart", false);
+};
+$("clientRestartDialog").addEventListener("cancel", () => action("confirmClientRestart", false));
 $("helpButton").onclick = () => $("helpDialog").showModal();
 document
   .querySelectorAll(".close-dialog")

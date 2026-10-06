@@ -4,6 +4,33 @@
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const check = (name, passed) => checks.push({check: name, passed: !!passed});
   window.backend = {action: (name, raw) => actions.push([name, JSON.parse(raw)])};
+  // 首次引导、路径修改与重启确认使用正式 DOM，假后端不影响真实网易云。
+  const directory = 'C:\\音乐工具\\网易云';
+  onEvent('clientSettings', {directory, setup: true});
+  check('首次路径引导显示自动识别的目录', $('clientPathDialog').open && $('clientPathInput').value === directory);
+  $('cancelClientPath').click();
+  check('跳过路径引导仍可使用工具', !$('clientPathDialog').open && actions.length === 0);
+  $('moreButton').click(); $('editClientPath').click();
+  onEvent('clientPathSelected', {directory: 'D:\\CloudMusic'});
+  $('saveClientPath').click();
+  check('设置中修改路径提交后等待保存回执', actions.at(-1)[0] === 'saveClientPath' && actions.at(-1)[1] === 'D:\\CloudMusic' && $('clientPathDialog').open);
+  onEvent('clientPathError', {message: '此路径下没有 cloudmusic.exe'});
+  check('无效路径留在弹窗内显示明确错误', $('clientPathDialog').open && !$('clientPathError').hidden && $('clientPathInput').getAttribute('aria-invalid') === 'true');
+  onEvent('clientSettings', {directory: 'D:\\CloudMusic', saved: true});
+  check('保存成功关闭引导并更新设置目录', !$('clientPathDialog').open && $('clientDirectorySummary').textContent === 'D:\\CloudMusic');
+  $('toolsDialog').close();
+  onEvent('clientStatus', {busy: true});
+  onEvent('clientRestartRequired', {directory});
+  check('连接期间禁用重复操作并显示重启确认', $('connectCloud').disabled && $('clientRestartDialog').open);
+  $('cancelClientRestart').click();
+  check('取消重启只发送取消指令', actions.at(-1)[0] === 'confirmClientRestart' && actions.at(-1)[1] === false);
+  onEvent('clientRestartRequired', {directory});
+  $('clientRestartDialog').dispatchEvent(new Event('cancel')); $('clientRestartDialog').close();
+  check('Esc 路径同样取消重启', actions.at(-1)[1] === false);
+  onEvent('clientRestartRequired', {directory}); $('confirmClientRestart').click();
+  check('确认后发送重启指令并关闭弹窗', actions.at(-1)[1] === true && !$('clientRestartDialog').open);
+  onEvent('clientStatus', {busy: false});
+  check('连接结束恢复路径设置和连接按钮', !$('connectCloud').disabled && !$('editClientPath').disabled);
   const lines = Array.from({length: 24}, (_, i) => ({start: i * 3000, end: (i + 1) * 3000,
     text: 'Sing along with the morning light', translation: '跟着清晨的光一起唱。', timing: 'line', words: []}));
   onEvent('mode', {mode: 'local'});
