@@ -13,6 +13,13 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 
 ## 下载与启动
 
+【百度盘】
+
+链接: https://pan.baidu.com/s/1ZKFEDhp-ZP8Tc7GGMzRvMg?pwd=kzx8 
+
+提取码: kzx8 
+
+
 1. 在 [Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.3.0-windows-x64.zip`。
 2. 完整解压到有写入权限的文件夹，例如 `D:\Utatomo`。不要在压缩包内直接运行。
 3. 双击 `Utatomo.exe`。便携版包含 Python、Qt 与离线注音词典，无需另行安装 Python。
