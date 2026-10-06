@@ -1,5 +1,6 @@
 """Build the portable Windows release with bundled dependency notices."""
 import hashlib
+import argparse
 import importlib.metadata
 import json
 import os
@@ -13,6 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dist-dir", type=Path, default=ROOT / "dist",
+                        help="构建输出目录；便携版正在运行时可使用另一个目录")
+    dist_dir = parser.parse_args().dist_dir.resolve()
+    # 独立输出目录允许在旧版运行、文件被占用时重建，不必结束用户程序。
     # SVG 是图标源文件，每次构建同步生成可执行文件使用的多尺寸 ICO。
     subprocess.run([sys.executable, str(ROOT / "scripts/create_icon.py")], cwd=ROOT, check=True)
     build_env = os.environ.copy()
@@ -20,9 +26,10 @@ def main():
     windows = Path(os.environ["SystemRoot"])
     build_env["PATH"] = os.pathsep.join(map(str, [Path(sys.executable).parent,
         Path(sys.base_prefix), windows / "System32", windows]))
-    subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "Utatomo.spec"],
+    subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm",
+                    "--distpath", str(dist_dir), "Utatomo.spec"],
                    cwd=ROOT, env=build_env, check=True)
-    bundle = ROOT / "dist/Utatomo"
+    bundle = dist_dir / "Utatomo"
     notices = bundle / "THIRD-PARTY-LICENSES"
     notices.mkdir(exist_ok=True)
     distributions = []
@@ -58,13 +65,13 @@ def main():
     for name in ("architecture.md", "third-party.md", "verification.md"):
         shutil.copy2(ROOT / "docs" / name, bundle / "docs" / name)
     version = __import__("tomllib").loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    archive = ROOT / "dist" / f"Utatomo-{version}-windows-x64.zip"
+    archive = dist_dir / f"Utatomo-{version}-windows-x64.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         for path in sorted(bundle.rglob("*")):
             if path.is_file() and path.relative_to(bundle).parts[0] not in {"data", ".cache", "output"}:
                 zf.write(path, path.relative_to(bundle.parent))
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
-    (ROOT / "dist/SHA256SUMS.txt").write_text(f"{checksum}  {archive.name}\n", encoding="ascii")
+    (dist_dir / "SHA256SUMS.txt").write_text(f"{checksum}  {archive.name}\n", encoding="ascii")
     print(f"Release: {archive} ({archive.stat().st_size / 1024**2:.1f} MiB)")
 
 

@@ -127,7 +127,7 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 
 在「设置 → 应用更新」可查看当前版本并点击「检查更新」。检查中禁用按钮，完成后显示是否需要更新；网络失败、请求限流或发布信息异常时显示原因，可重试或点击「查看 GitHub 发布页」。启动检查无更新或失败时不弹窗，不影响歌词与本地练唱。
 
-检查只访问 GitHub 公开发布接口，不要求 GitHub 登录，不上传歌曲、歌词或本地设置；不检查预发布和仅有标签的版本，不自动下载安装。升级时退出旧程序，把新包完整解压到新目录，再复制原 `data/` 文件夹；保留新包的 `_internal`，不要混用旧依赖。
+检查先访问 GitHub 公开发布接口；接口限流、超时或响应异常时自动改查 GitHub 官网的最新版 Release 入口，无需消耗匿名 API 配额。两路只要有一路正常即可确认版本，沿用环境或 Windows 系统代理设置，不要求 GitHub 登录，不上传歌曲、歌词或本地设置；不检查预发布和仅有标签的版本，不自动下载安装。升级时退出旧程序，把新包完整解压到新目录，再复制原 `data/` 文件夹；保留新包的 `_internal`，不要混用旧依赖。
 
 ## 从源码运行与打包
 
@@ -154,7 +154,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap.ps1
 .venv/Scripts/python.exe scripts/build_release.py
 ```
 
-打包需要 Windows x64，产物位于 `dist/`。源码采用 [GPLv3](LICENSE)；第三方组件保留各自许可证，便携包附带 `THIRD-PARTY-LICENSES/`。歌曲、歌词与在线服务内容归各自权利人。
+打包需要 Windows x64，产物位于 `dist/`。若该目录的便携版正在运行，可加 `--dist-dir dist/update-fix` 在独立目录重建，避免覆盖被占用的文件。源码采用 [GPLv3](LICENSE)；第三方组件保留各自许可证，便携包附带 `THIRD-PARTY-LICENSES/`。歌曲、歌词与在线服务内容归各自权利人。
 
 图标源文件为 `assets/icon.svg`。构建时 `scripts/create_icon.py` 自动生成 16、24、32、48、64、128、256 像素的 `assets/icon.ico`，由 PyInstaller 嵌入 EXE。更新版本时请完整解压新包，保留原 `data/` 以沿用个人设置。
 

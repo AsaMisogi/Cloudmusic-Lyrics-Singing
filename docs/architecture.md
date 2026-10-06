@@ -133,8 +133,8 @@ BAT 同步调用 Python，后端和 Qt 主窗口属于同一个进程。Qt 退�
 
 ## 应用更新（0.3.0）
 
-- 使用 [GitHub Latest Release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)，匿名 HTTPS 读取仓库维护者指定的最新正式版。响应必须为 200、JSON 对象，且 draft / prerelease 均为 false。正式标签使用可选 v 前缀及三段数字，与当前版本按整数元组比较；不把日期、标签排序或字符串大小当成版本新旧。
-- 请求使用现有 requests 依赖，连接 / 读取超时分别为 3.05 / 7 秒，保留默认 TLS 校验，不跟随重定向，不自动重试。403 / 429、404、其他 HTTP 错误、离线和无效响应均返回失败，不冒充最新版本；下次启动或手动操作可以重试。公共 API 限流时可通过发布页访问下载。
+- 使用 [GitHub Latest Release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)，匿名 HTTPS 读取仓库维护者指定的最新正式版；失败后改查 [GitHub 官网最新版入口](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases)。响应必须为 200、JSON 对象，且 draft / prerelease 均为 false。正式标签使用可选 v 前缀及三段数字，与当前版本按整数元组比较；不把日期、标签排序或字符串大小当成版本新旧。
+- 请求使用现有 requests 依赖，连接 / 读取超时分别为 3.05 / 7 秒，保留默认 TLS 校验，不跟随重定向，不自动重试。403 / 429、404、其他 HTTP 错误、离线和无效响应均触发官网后备检查；两路失败不冒充最新版本；下次启动或手动操作可以重试。公共 API 限流时自动由官网入口确认版本，不依赖 API 配额。官网请求使用 GET + stream，只读跳转头，不跟随或下载网页正文；只接受 HTTPS github.com、本仓库 /releases/tag/ 路径和有效正式标签，拒绝登录、外站、其他仓库、查询参数及预发布标签。两路失败才报告无法确认，明确建议检查网络或代理。
 - 独立单线程 update_pool 复用已有后台任务与 Qt 信号回主线程机制；不进入歌曲 pending 队列、不携带歌曲 generation，因此切歌不会取消更新。update_busy 合并重复检查，手动加入正在进行的启动检查时提升为完整反馈。退出时取消排队任务，晚到结果不更新界面。
 - WebChannel initialize 完成后每个进程自动检查一次；无更新或失败只结束忙状态并记录错误日志，发现新版才发送提示。手动检查始终反馈结果。--smoke-test 跳过自动联网，以保持播放器回归稳定；专用 verify_updates.py 用临时数据、固定 HTTP 响应、真实桥接和工作线程单独覆盖更新链路。
 - 前端从后端读取当前版本，侧栏和设置共用 __version__；发布时同步 pyproject.toml、uv.lock 与 __init__.py。更新提示等待路径引导或其他模态窗口关闭，避免抢占焦点；手动检查发现新版时关闭设置再提示，Esc / 关闭 / 稍后均不触发浏览器。

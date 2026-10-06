@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from utatomo import app as runtime
+from utatomo.updates import RELEASES_URL
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineProfile
@@ -22,10 +23,13 @@ def main():
     response.__enter__ = Mock(return_value=response)
     response.__exit__ = Mock(return_value=False)
     response.json.return_value = {"tag_name": "v0.4.0", "draft": False, "prerelease": False}
+    website = Mock(status_code=302, headers={"Location": runtime.REPOSITORY_URL + "/releases/tag/v0.3.0"})
+    website.__enter__ = Mock(return_value=website)
+    website.__exit__ = Mock(return_value=False)
     with tempfile.TemporaryDirectory() as directory, \
             patch.object(runtime, "DATA", Path(directory)), \
             patch.object(runtime, "CloudMedia"), \
-            patch("utatomo.updates.requests.get", return_value=response) as get, \
+            patch("utatomo.updates.requests.get", side_effect=lambda url, **kwargs: website if url == RELEASES_URL else response) as get, \
             patch.object(runtime.QDesktopServices, "openUrl", return_value=True) as browser:
         app = QApplication([])
         window = QMainWindow()
@@ -68,10 +72,15 @@ def main():
             checks.append({"check": "下载仅打开后端固定仓库版本页", "passed": browser.call_count == 1 and browser.call_args.args[0].toString() == runtime.REPOSITORY_URL + "/releases/tag/v0.4.0"})
             response.status_code = 429
             page.runJavaScript("$('toolsDialog').showModal(); $('checkUpdate').click();")
-            QTimer.singleShot(300, lambda: check("限流失败反馈可见且按钮恢复", "!$('checkUpdate').disabled && $('updateFeedback').textContent.includes('限制')", finish))
+            QTimer.singleShot(300, lambda: check("API 限流后官网后备检查成功且按钮恢复", "!$('checkUpdate').disabled && $('updateFeedback').textContent.includes('无需更新') && !$('updateDialog').open", both_unavailable))
+
+        def both_unavailable():
+            website.status_code = 429
+            page.runJavaScript("$('checkUpdate').click();")
+            QTimer.singleShot(300, lambda: check("两路均不可用时显示网络建议并允许重试", "!$('checkUpdate').disabled && $('updateFeedback').textContent.includes('网络或代理')", finish))
 
         def finish():
-            checks.append({"check": "启动一次加三次手动请求无额外重复", "passed": get.call_count == 4})
+            checks.append({"check": "首选成功仅一次请求，失败才尝试后备入口", "passed": get.call_count == 7})
             # 经真实语言线程和桥接产出罗马音，继续验证新显示偏好重载后的行为。
             bridge._work(bridge.language_pool, "annotated", lambda: bridge._enrich([
                 {"start": 0, "end": 5000, "text": "明日へ光を追いかけて", "pronunciation": "a su e hi ka ri wo o i ka ke te", "translation": "向着明天追寻光芒", "timing": "line", "words": []},
@@ -98,7 +107,7 @@ def main():
             QTimer.singleShot(100, lambda: check("关闭后真实歌词恢复假名且无额外更新请求", "!state.romaji && lyricRows[0].querySelector('rt').textContent==='あす'", final_report))
 
         def final_report():
-            checks.append({"check": "界面重载不重复自动检查更新", "passed": get.call_count == 4})
+            checks.append({"check": "界面重载不重复自动检查更新", "passed": get.call_count == 7})
             page.runJavaScript("JSON.stringify(window.__errors)", report)
 
         def report(raw):

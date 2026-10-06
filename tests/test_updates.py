@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from utatomo.app import Bridge
-from utatomo.updates import check_update, version_tuple, REPOSITORY_URL
+from utatomo.updates import check_update, version_tuple, REPOSITORY_URL, RELEASES_URL
 
 
 class UpdateTests(unittest.TestCase):
@@ -61,6 +61,63 @@ class UpdateTests(unittest.TestCase):
         response.json.side_effect = ValueError("malformed JSON")
         with patch("utatomo.updates.requests.get", return_value=response):
             self.assertEqual(check_update()["status"], "error")
+
+    def website(self, location=None, status=302):
+        response = self.response(status=status)
+        response.headers = {"Location": location or REPOSITORY_URL + "/releases/tag/v0.3.0"}
+        return response
+
+    def test_rate_limit_and_http_failure_fall_back_to_website(self):
+        for status in (403, 429, 404, 500):
+            with self.subTest(status=status), patch("utatomo.updates.requests.get", side_effect=[
+                    self.response(status=status), self.website()]) as get:
+                result = check_update("0.2.1")
+                self.assertEqual(result["status"], "available")
+                self.assertEqual(result["version"], "0.3.0")
+                self.assertEqual(get.call_count, 2)
+                self.assertEqual(get.call_args.args[0], RELEASES_URL)
+                self.assertTrue(get.call_args.kwargs["stream"])
+                self.assertFalse(get.call_args.kwargs["allow_redirects"])
+
+    def test_timeout_tls_and_proxy_failure_can_recover_on_other_host(self):
+        for error in (requests.Timeout(), requests.exceptions.SSLError(), requests.exceptions.ProxyError()):
+            with self.subTest(error=error), patch("utatomo.updates.requests.get", side_effect=[error, self.website()]):
+                self.assertEqual(check_update()["status"], "current")
+
+    def test_invalid_api_payload_can_recover_via_website(self):
+        for response in (self.response("unknown"), self.response(prerelease=True), self.response(draft=True)):
+            with patch("utatomo.updates.requests.get", side_effect=[response, self.website()]):
+                self.assertEqual(check_update()["status"], "current")
+        response = self.response()
+        response.json.side_effect = ValueError("invalid JSON")
+        with patch("utatomo.updates.requests.get", side_effect=[response, self.website()]):
+            self.assertEqual(check_update()["status"], "current")
+
+    def test_website_relative_url_numeric_comparison_and_old_version(self):
+        for tag, expected in (("v0.10.0", "available"), ("0.3.0", "current"), ("v0.2.1", "current")):
+            with self.subTest(tag=tag), patch("utatomo.updates.requests.get", side_effect=[
+                    requests.ConnectionError(), self.website("/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/tag/" + tag)]):
+                self.assertEqual(check_update()["status"], expected)
+
+    def test_website_rejects_login_proxy_external_and_nonstable_redirects(self):
+        for location in ("https://evil.example/releases/tag/v9.0.0", "https://github.com/other/repo/releases/tag/v9.0.0",
+                         REPOSITORY_URL + "/releases/tag/v0.4.0-rc.1", REPOSITORY_URL + "/releases/tag/v0.4.0/extra",
+                         REPOSITORY_URL + "/releases/tag/v0.4.0?redirect=evil", "http://github.com/login",
+                         "https://github.com/login", "https://user@github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/tag/v0.4.0",
+                         REPOSITORY_URL + "/releases/tag/%2Fv0.4.0", REPOSITORY_URL + "/releases/tag/v0.4.0#fragment"):
+            with self.subTest(location=location), patch("utatomo.updates.requests.get", side_effect=[
+                    requests.Timeout(), self.website(location)]):
+                self.assertEqual(check_update()["status"], "error")
+        for status in (200, 403, 429, 404, 500):
+            with patch("utatomo.updates.requests.get", side_effect=[requests.Timeout(), self.website(status=status)]):
+                self.assertEqual(check_update()["status"], "error")
+
+    def test_offline_does_not_report_latest_and_does_not_loop(self):
+        with patch("utatomo.updates.requests.get", side_effect=requests.ConnectionError()) as get:
+            result = check_update()
+            self.assertEqual(result["status"], "error")
+            self.assertIn("网络或代理", result["message"])
+            self.assertEqual(get.call_count, 2)
 
     def bridge(self):
         return SimpleNamespace(closing=False, update_manual=False, update_busy=False,
