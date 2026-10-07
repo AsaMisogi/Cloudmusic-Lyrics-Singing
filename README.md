@@ -15,6 +15,11 @@ Windows 日语、英语歌词跟唱工具。可以跟随网易云音乐显示歌
 注：该项目由AI辅助完成。
 
 
+B站演示视频：
+
+https://www.bilibili.com/video/BV1ZfHf6pEik/
+
+
 ## 下载与启动
 
 【百度盘】
