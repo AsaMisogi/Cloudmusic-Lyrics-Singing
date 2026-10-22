@@ -10,9 +10,11 @@
     <title>咏伴 · Utatomo</title>
     <link rel="icon" href="../assets/icon.svg" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="library.css" />
     <script src="qrc:///qtwebchannel/qwebchannel.js" defer></script>
     <script src="playback-clock.js" defer></script>
     <script src="app.js" defer></script>
+    <script src="library.js" defer></script>
   </head>
   <body>
     <svg class="icon-defs" aria-hidden="true">
@@ -50,6 +52,12 @@
           <circle cx="12" cy="12" r="9" />
           <path d="M9 9a3 3 0 1 1 5 2c-2 1-2 2-2 3m0 2v1" />
         </symbol>
+        <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-5v6l4 2" /></symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20 5c-2-2-5-2-8 1-3-3-6-3-8-1s-2 5 0 7l8 8 8-8c2-2 2-5 0-7Z" /></symbol>
+        <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M3 6h1m-1 6h1m-1 6h1" /></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" /></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" /></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z" /></symbol>
       </defs>
     </svg>
     <aside class="sidebar">
@@ -67,6 +75,10 @@
           <svg><use href="#i-music" /></svg>本地歌曲
         </button>
       </nav>
+      <nav class="library-nav" aria-label="我的曲库">
+        <button id="recentButton" class="nav-item"><svg aria-hidden="true"><use href="#i-history" /></svg>最近播放<span id="recentCount" class="nav-count">0</span></button>
+        <button id="libraryButton" class="nav-item"><svg aria-hidden="true"><use href="#i-heart" /></svg>曲库收藏</button>
+      </nav>
       <div class="sidebar-rule"></div>
       <div class="album">
         <img
@@ -76,8 +88,12 @@
       </div>
       <div class="track-info">
         <span class="eyebrow">NOW LEARNING</span>
-        <h2 id="trackTitle">等待音乐响起</h2>
+        <div class="track-title-row"><h2 id="trackTitle">等待音乐响起</h2></div>
         <p id="trackArtist">在网易云播放一首喜欢的歌</p>
+        <div class="current-track-actions">
+          <button id="favoriteCurrent" class="favorite-button outline-button" aria-label="将当前歌曲加入最爱" aria-pressed="false" title="将当前歌曲加入最爱" disabled><svg aria-hidden="true"><use href="#i-heart" /></svg><span id="favoriteCurrentLabel">最爱</span></button>
+          <button id="playlistCurrent" class="outline-button" title="将当前歌曲加入工具歌单" disabled><svg aria-hidden="true"><use href="#i-plus" /></svg>加入歌单</button>
+        </div>
       </div>
       <div id="connection" class="connection">
         <span class="status-dot"></span
@@ -114,7 +130,7 @@
         <div class="display-switches">
           <label
             ><input id="rubyToggle" type="checkbox" checked /><span
-              >假名 / 音标</span
+              >显示注音</span
             ></label
           ><label
             ><input id="translationToggle" type="checkbox" checked /><span
@@ -122,6 +138,7 @@
             ></label
           >
           <label><input id="romajiToggle" type="checkbox" /><span>日语罗马音</span></label>
+          <label><input id="cantoneseToggle" type="checkbox" /><span>中文粤拼</span></label>
         </div>
         <label class="dictionary-switch"
           ><svg><use href="#i-book" /></svg><span>词典模式</span
@@ -302,12 +319,12 @@
       </section>
     </main>
     <div id="toast" role="status" hidden></div>
-    <dialog id="searchDialog">
+    <dialog id="searchDialog" aria-labelledby="searchTitle">
       <form id="searchForm">
         <div class="modal-title">
           <div>
             <span class="eyebrow">FIND THE WORDS</span>
-            <h2>找到这首歌的歌词</h2>
+            <h2 id="searchTitle">找到这首歌的歌词</h2>
           </div>
           <button
             type="button"
@@ -321,6 +338,7 @@
         <div class="search-input">
           <input
             id="searchInput"
+            aria-label="搜索歌词的歌名、ID 或链接"
             placeholder="歌名 / ID / 链接"
             autocomplete="off"
           /><button class="primary-button" type="submit">搜索</button>
@@ -331,9 +349,9 @@
         <div id="searchResults"></div>
       </form>
     </dialog>
-    <dialog id="toolsDialog">
+    <dialog id="toolsDialog" aria-labelledby="toolsTitle">
       <div class="modal-title">
-        <h2>全局设置与歌词工具</h2>
+        <h2 id="toolsTitle">设置与歌词工具</h2>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
       <section class="app-update" aria-labelledby="updateSettingTitle">
@@ -361,6 +379,9 @@
           ><span>联网补全缺失译文：Google / MyMemory</span>
         </button>
       </div>
+      <label class="setting-row lyric-font-setting" for="lyricFont"><span>歌词文本字体</span><select id="lyricFont" aria-describedby="lyricFontHint"><option value="">默认 · 统一黑体</option></select></label>
+      <p id="lyricFontHint" class="muted">使用本机已安装的字体；原文即时预览，注音保持清晰易读的字体。</p>
+      <p id="lyricFontPreview" class="lyric-font-preview" aria-label="歌词字体预览">作词・作詞　黄家驹・黃家駒<br />君と歌う　You belong to me</p>
       <label class="setting-row"
         >歌词字号<input
           id="fontSize"
@@ -420,10 +441,10 @@
       <p id="clientRestartDirectory" class="client-directory"></p>
       <div class="dialog-actions"><button id="cancelClientRestart" autofocus>取消</button><button id="confirmClientRestart" class="primary-button">重启并连接</button></div>
     </dialog>
-    <dialog id="correctDialog">
+    <dialog id="correctDialog" aria-labelledby="correctTitle">
       <form id="correctForm">
         <div class="modal-title">
-          <h2>修正注音</h2>
+          <h2 id="correctTitle">修正注音</h2>
           <button
             type="button"
             class="close-dialog icon-button"
@@ -436,17 +457,20 @@
         <div id="readingCandidates" class="reading-candidates"></div>
         <input
           id="correctReading"
+          aria-label="修正读音，留空恢复自动注音"
+          aria-describedby="correctError"
           placeholder="输入平假名或 IPA，留空恢复自动注音"
         />
+        <p id="correctError" class="inline-error" role="alert" hidden></p>
         <p class="muted">
           只修正当前歌曲、当前句中的这个词，不影响其他位置或歌曲。留空恢复歌曲读音或词典读法。
         </p>
-        <button class="primary-button" type="submit">保存注音</button>
+        <button id="saveReading" class="primary-button" type="submit">保存注音</button>
       </form>
     </dialog>
-    <dialog id="helpDialog">
+    <dialog id="helpDialog" aria-labelledby="helpTitle">
       <div class="modal-title">
-        <h2>每次，练好一句。</h2>
+        <h2 id="helpTitle">每次，练好一句。</h2>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
       <div class="help-copy">
@@ -469,12 +493,82 @@
           「日语罗马音」默认关闭，开启后日语假名注音改为罗马音，纯假名词也显示罗马音；英语音标不变。开关自动保存，注音总开关仍可隐藏所有注音。勾选词典模式，点击词汇查看释义。Shift +
           点击歌词仍可跳转。日语读法使用词法分析，英文为美式宽式音标；特殊唱法可在词典面板修正。
         </p>
+        <p>「中文粤拼」默认关闭，开启后中文原文上方显示带 1–6 声调数字的粤语读音（例如 ngo5），支持简繁体。中文译文不注音；日语和英语沿用各自读法。在词典模式点击汉字可比较候选或修正粤拼。</p>
+        <h3>把常练的歌放在一起</h3>
+        <p>侧栏「最近播放」记录实际播放过的歌曲，可搜索并直接播放；「曲库收藏」可添加本地文件、搜索网易云歌曲或粘贴歌曲链接，并在本地创建歌单。歌单可混合两种来源，不修改网易云账号收藏。移出列表只移除记录，不删除音频；文件移动后可重新定位。</p>
         <h3>网络与退出</h3>
         <p>
           歌词来自网易云，中文词义来自有道；点击“补充中文机译”才会把缺少译文的歌词发送给
           Google 翻译；不可用时使用 MyMemory。启动及手动检查更新会访问 GitHub 正式发布接口。关闭本窗口或日志窗口即可退出工具。
         </p>
       </div>
+    </dialog>
+    <!-- 曲库保持单一列表与来源筛选，歌词搜索继续只替换歌词，避免两个操作混淆。 -->
+    <dialog id="libraryDialog" aria-labelledby="libraryTitle">
+      <div class="library-header">
+        <div><span class="eyebrow">YOUR PRACTICE COLLECTION</span><h2 id="libraryTitle">最近播放</h2></div>
+        <button class="close-dialog icon-button" aria-label="关闭曲库">×</button>
+      </div>
+      <div class="library-tabs" role="tablist" aria-label="曲库视图">
+        <button id="historyTab" role="tab" aria-selected="true" aria-controls="libraryBody">最近播放</button>
+        <button id="favoritesTab" role="tab" aria-selected="false" aria-controls="libraryBody">曲库收藏</button>
+      </div>
+      <div id="libraryBody" class="library-body">
+        <aside id="playlistSidebar" class="playlist-sidebar" aria-label="本地歌单" hidden>
+          <button id="allFavorites" class="playlist-item selected"><svg aria-hidden="true"><use href="#i-music" /></svg>全部曲目</button>
+          <button id="lovedTracks" class="playlist-item"><svg aria-hidden="true"><use href="#i-heart" /></svg>最爱</button>
+          <div class="playlist-heading"><span>我的歌单</span><button id="createPlaylist" class="icon-button small" aria-label="新建歌单" title="新建歌单"><svg aria-hidden="true"><use href="#i-plus" /></svg></button></div>
+          <div id="playlistList"></div>
+          <p class="muted playlist-note">红心加入最爱；取消红心不移出曲库。歌单保存在本机。</p>
+        </aside>
+        <section class="library-main" aria-label="歌曲列表">
+          <div class="library-actions">
+            <label class="library-search"><svg aria-hidden="true"><use href="#i-search" /></svg><input id="librarySearchInput" type="search" placeholder="搜索歌名、歌手、专辑或路径" aria-label="搜索当前列表" autocomplete="off" /></label>
+            <button id="importLibraryAudio" class="outline-button" title="添加本地音频，可多选"><svg aria-hidden="true"><use href="#i-folder" /></svg>添加本地</button>
+            <button id="addCloudTrack" class="outline-button"><svg aria-hidden="true"><use href="#i-cloud" /></svg>添加网易云</button>
+          </div>
+          <div class="library-filter-row">
+            <button id="libraryConnectCloud" class="text-button" title="启用后台切歌；正在运行的客户端会先询问是否重启">连接客户端以后台切歌</button>
+            <div id="sourceFilters" class="segmented" role="group" aria-label="歌曲来源">
+              <button data-source="all" aria-pressed="true">全部</button><button data-source="local" aria-pressed="false">本地</button><button data-source="cloud" aria-pressed="false">网易云</button>
+            </div>
+            <span id="librarySummary" class="muted" role="status"></span>
+            <div class="player-spacer"></div>
+            <button id="renamePlaylist" class="text-button" hidden>重命名</button>
+            <button id="deletePlaylist" class="text-button danger-text" hidden>删除歌单</button>
+            <button id="clearHistory" class="text-button" title="只清除所选来源的历史，不影响收藏">清空记录</button>
+          </div>
+          <p id="libraryFeedback" class="library-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="libraryTracks" class="library-tracks" aria-label="曲目"></div>
+          <div class="library-pagination"><span id="libraryPageLabel" class="muted"></span><div class="player-spacer"></div><button id="libraryPrev" class="outline-button">上一页</button><button id="libraryNext" class="outline-button">下一页</button></div>
+        </section>
+      </div>
+    </dialog>
+    <dialog id="playlistNameDialog" aria-labelledby="playlistNameTitle">
+      <form id="playlistNameForm">
+        <div class="modal-title"><h2 id="playlistNameTitle">新建歌单</h2><button type="button" class="close-dialog icon-button" aria-label="关闭">×</button></div>
+        <label for="playlistNameInput">歌单名称</label><input id="playlistNameInput" type="text" maxlength="80" placeholder="例如：通勤练唱、粤语入门" required autocomplete="off" />
+        <p id="playlistNameError" class="inline-error" role="alert" hidden></p>
+        <div class="dialog-actions"><button type="button" class="close-dialog outline-button">取消</button><button id="savePlaylistName" class="primary-button" type="submit">保存歌单</button></div>
+      </form>
+    </dialog>
+    <dialog id="playlistPickerDialog" aria-labelledby="playlistPickerTitle">
+      <div class="modal-title"><h2 id="playlistPickerTitle">加入歌单</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
+      <p id="playlistPickerTrack"></p><div id="playlistPickerList"></div><p id="playlistPickerFeedback" class="inline-error" role="status" hidden></p>
+      <button id="pickerCreatePlaylist" class="outline-button"><svg aria-hidden="true"><use href="#i-plus" /></svg>新建歌单</button>
+    </dialog>
+    <dialog id="cloudAddDialog" aria-labelledby="cloudAddTitle">
+      <form id="cloudAddForm">
+        <div class="modal-title"><h2 id="cloudAddTitle">添加网易云歌曲</h2><button type="button" class="close-dialog icon-button" aria-label="关闭">×</button></div>
+        <label for="cloudAddInput">歌名、歌曲 ID 或歌曲链接</label>
+        <div class="search-input"><input id="cloudAddInput" type="text" placeholder="搜索歌曲，或粘贴网易云歌曲链接" required autocomplete="off" /><button id="cloudAddSearch" class="primary-button" type="submit">搜索</button></div>
+        <p id="cloudAddFeedback" class="muted" role="status">加入本地曲库收藏，不修改网易云账号歌单。</p><div id="cloudAddResults"></div>
+      </form>
+    </dialog>
+    <dialog id="libraryConfirmDialog" aria-labelledby="libraryConfirmTitle" aria-describedby="libraryConfirmDescription">
+      <div class="modal-title"><h2 id="libraryConfirmTitle"></h2></div><p id="libraryConfirmDescription"></p>
+      <p id="libraryConfirmError" class="inline-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button class="close-dialog outline-button" autofocus>取消</button><button id="libraryConfirmAction" class="danger-button">确认移除</button></div>
     </dialog>
   </body>
 </html>

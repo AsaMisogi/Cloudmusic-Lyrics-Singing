@@ -27,6 +27,9 @@ const state = {
   pendingSeek: null,
   dict: false,
   romaji: false,
+  cantonese: false,
+  lyricFont: "",
+  correctionToken: null,
   token: null,
   loop: null,
   a: null,
@@ -37,6 +40,8 @@ window.addEventListener("error", (e) => window.__errors.push(e.message));
 let toastTimer,
   lastRenderActive = -2;
 let lyricRows = [], activeTokens = [], previousFrame = 0;
+let modalOpen = false, lastPlayback = {}, lastCloud = null;
+const setText = (element, value) => { if (element.textContent !== String(value)) element.textContent = value; };
 function action(name, value = null) {
   if (window.backend) window.backend.action(name, JSON.stringify(value));
   else toast("请通过项目中的启动.bat 打开桌面版。", true);
@@ -106,6 +111,7 @@ function goLine(delta) {
   seek(state.lines[i].start + state.offset);
 }
 function updatePlayback(data) {
+  lastPlayback = data;
   const now = performance.now();
   let force = false;
   if (state.pendingSeek) {
@@ -126,12 +132,17 @@ function updatePlayback(data) {
     hasTimeline: data.hasTimeline !== false,
     sampled: performance.now(),
   });
-  $("playGlyph").textContent = state.playing ? "Ⅱ" : "▶";
+  // 弹窗不需要重绘背后的毫秒计时、按钮与进度条；真实播放状态继续接收。
+  if (!modalOpen) renderPlaybackControls();
+}
+function renderPlaybackControls() {
+  const data = lastPlayback;
+  setText($("playGlyph"), state.playing ? "Ⅱ" : "▶");
   $("play").setAttribute("aria-label", state.playing ? "暂停" : "播放");
   $("seek").disabled = !state.canSeek;
   $("seek").max = Math.max(1, state.duration);
   $("play").disabled = data.canPlay === false;
-  $("duration").textContent = time(state.duration);
+  setText($("duration"), time(state.duration));
   $("speed").disabled = !state.canRate;
   $("speed").value = String(state.rate);
   for (const id of [
@@ -172,9 +183,41 @@ function showWord(token) {
   $("dictReading").textContent =
     (state.romaji && token.language === "ja" ? token.romaji : "") || token.reading || (token.language === "ja" ? token.text : "暂无词典音标");
   $("dictPos").textContent = token.pos || "词汇";
+  $("correctButton").textContent = token.language === "zh" ? "修正这个字的粤拼 ↗" : "修正这个词的注音 ↗";
+  $("dictionaryWeb").hidden = token.language === "zh";
   $("dictDefinitions").textContent = "正在查询中文释义…";
   $("dictSource").textContent = token.source;
   action("dictionary", token);
+}
+function displayTokens(line) {
+  if (!line.cantoneseTokens) return line.tokens || [{text: line.text, reading: ""}];
+  // 中文关闭粤拼时保留英文 IPA，不把同形汉字显示成日语词典猜读。
+  return state.cantonese ? line.cantoneseTokens : line.cantoneseTokens.map(token =>
+    token.language === "zh" ? {...token, reading: "", readingCandidates: []} : token);
+}
+function appendLineTokens(original, line) {
+  let character = 0;
+  for (const token of displayTokens(line)) {
+    const span = document.createElement("span");
+    span.className = "token" + (token.language === "en" ? " en" : token.language === "zh" ? " zh" : "");
+    span.dataset.start = character;
+    character += token.text.length;
+    span.dataset.end = character;
+    span.dataset.clickable = !!token.language && !!token.text.trim();
+    span.classList.toggle("reading-conflict", !!token.readingConflict);
+    if (token.reading) span.title = `${token.reading} · ${token.source || "自动注音"}` +
+      (token.readingConflict ? "\n读音有分歧，词典模式中可比较并修正：" +
+        token.readingCandidates.map(c=>`${c.reading}（${c.source}）`).join(" / ") : "");
+    span.lyricToken = token;
+    renderTokenReading(span, token);
+    span.addEventListener("click", (e) => {
+      const current = span.lyricToken;
+      if (state.dict && !e.shiftKey && current.language) {
+        e.stopPropagation(); showWord(current);
+      }
+    });
+    original.append(span);
+  }
 }
 function renderLyrics() {
   const fragment = document.createDocumentFragment();
@@ -190,32 +233,7 @@ function renderLyrics() {
     );
     const original = document.createElement("div");
     original.className = "lyric-original";
-    let character = 0;
-    (line.tokens || [{ text: line.text, reading: "" }]).forEach((token) => {
-      const span = document.createElement("span");
-      span.className =
-        "token" +
-        (token.reading ? " has-reading" : "") +
-        (token.language === "en" ? " en" : "");
-      span.dataset.start = character;
-      character += token.text.length;
-      span.dataset.end = character;
-      span.dataset.clickable = !!token.language && !!token.text.trim();
-      span.classList.toggle("reading-conflict", !!token.readingConflict);
-      if (token.reading) span.title = `${token.reading} · ${token.source || "自动注音"}` +
-        (token.readingConflict ? "\n读音有分歧，词典模式中可比较并修正：" +
-          token.readingCandidates.map(c=>`${c.reading}（${c.source}）`).join(" / ") : "");
-      // 保留词汇对象与点击边界；切换显示时只重建词内 ruby，不重载歌词或播放器。
-      span.lyricToken = token;
-      renderTokenReading(span, token);
-      span.addEventListener("click", (e) => {
-        if (state.dict && !e.shiftKey && token.language) {
-          e.stopPropagation();
-          showWord(token);
-        }
-      });
-      original.append(span);
-    });
+    appendLineTokens(original, line);
     if (!line.text) original.textContent = "· · ·";
     row.append(original);
     if (line.translation) {
@@ -250,6 +268,44 @@ function renderLyrics() {
   lastRenderActive = -2;
   state.resumeFollowAt = 0;
   $("followButton").hidden = true;
+}
+function refreshCantonese() {
+  state.cantonese = $("cantoneseToggle").checked;
+  state.lines.forEach((line, index) => {
+    if (!line.cantoneseTokens) return;
+    const original = lyricRows[index]?.querySelector(".lyric-original");
+    if (original) { original.replaceChildren(); appendLineTokens(original, line); }
+  });
+  state.token = null;
+  $("dictEmpty").hidden = false; $("dictContent").hidden = true;
+  activeTokens = Array.from(lyricRows[state.active]?.querySelectorAll(".token-base") || []);
+  updateHighlight(estimatedPosition()); followCurrent(); savePreferences();
+}
+function patchReadings(data) {
+  // 修正只更新有变化的词，保留行对象、滚动位置、循环及手动浏览状态。
+  if (data.lines.length !== state.lines.length || data.lines.some((line, i) =>
+    line.text !== state.lines[i].text || line.start !== state.lines[i].start)) return;
+  state.lines = data.lines;
+  data.lines.forEach((line, i) => {
+    const tokens = displayTokens(line);
+    lyricRows[i]?.querySelectorAll(".token").forEach((span, index) => {
+      const token = tokens[index];
+      if (!token) return;
+      if (token.reading !== span.lyricToken.reading || token.romaji !== span.lyricToken.romaji) {
+        span.lyricToken = token; renderTokenReading(span, token);
+        span.title = token.reading ? `${token.reading} · ${token.source}` : "";
+      } else span.lyricToken = token;
+    });
+  });
+  const saved = data.token;
+  state.token = data.lines.flatMap(line => displayTokens(line)).find(token => token.scope === saved.scope &&
+    token.lineKey === saved.lineKey && token.tokenStart === saved.tokenStart && token.text === saved.text &&
+    (token.readingSystem || "default") === (saved.readingSystem || "default")) || null;
+  if (state.token) showWord(state.token);
+  activeTokens = Array.from(lyricRows[state.active]?.querySelectorAll(".token-base") || []);
+  $("correctDialog").close();
+  $("saveReading").disabled = false; $("saveReading").textContent = "保存注音";
+  toast("注音已保存。");
 }
 function rubyParts(token) {
   if (token.language !== "ja" || !token.reading) return [token];
@@ -360,6 +416,7 @@ function updateHighlight(position) {
 }
 // 居中模式给首尾留半屏空白；坐标以 viewport 为基准，避免 offsetParent 不同造成偏移。
 function followCurrent() {
+  if (modalOpen) return;
   if (!state.follow || state.resumeFollowAt > performance.now()) return;
   const row = lyricRows[state.active], viewport = $("lyricViewport");
   if (!row) return;
@@ -372,6 +429,11 @@ function followCurrent() {
 function frame(now) {
   const elapsed = Math.min(50, now - (previousFrame || now));
   previousFrame = now;
+  if (modalOpen || document.hidden) {
+    // 降低合成唤醒，避免部分显卡上弹窗与歌词渐变反复争用重绘层。
+    setTimeout(() => requestAnimationFrame(frame), 100);
+    return;
+  }
   if (state.follow && state.resumeFollowAt && now >= state.resumeFollowAt) {
     state.resumeFollowAt = 0;
     $("followButton").hidden = true;
@@ -390,7 +452,7 @@ function frame(now) {
     ? Number($("seek").value)
     : estimatedPosition();
   if (!state.dragging) $("seek").value = position;
-  $("position").textContent = state.hasTimeline ? time(position) : "— — : — —";
+  setText($("position"), state.hasTimeline ? time(position) : "— — : — —");
   $("seek").style.setProperty(
     "--progress",
     `${state.duration ? (position / state.duration) * 100 : 0}%`,
@@ -453,8 +515,26 @@ function showPendingUpdate() {
 document.querySelectorAll("dialog").forEach(dialog => {
   dialog.addEventListener("close", () => setTimeout(showPendingUpdate, 0));
 });
+// 原生 dialog 的 open 属性是唯一模态依据，嵌套弹窗或 Esc 均使用同一路径。
+new MutationObserver(() => {
+  const open = !!document.querySelector("dialog[open]");
+  if (open === modalOpen) return;
+  modalOpen = open;
+  if (!open) {
+    renderPlaybackControls();
+    if (lastCloud && state.mode === "cloud") renderCloudStatus(lastCloud);
+    updateHighlight(estimatedPosition()); followCurrent();
+  }
+}).observe(document.body, {subtree: true, attributes: true, attributeFilter: ["open"]});
 function onEvent(kind, data) {
-  if (kind === "mode") setMode(data.mode);
+  if (kind === "lyricFonts") setLyricFonts(data.families || []);
+  else if (kind.startsWith("library") || kind === "playlistCreated") {
+    if (typeof libraryEvents === "function") libraryEvents(kind, data);
+  } else if (kind === "readingCorrected") patchReadings(data);
+  else if (kind === "correctError") {
+    $("correctError").textContent = data.message; $("correctError").hidden = false;
+    $("saveReading").disabled = false; $("saveReading").textContent = "保存注音";
+  } else if (kind === "mode") setMode(data.mode);
   else if (kind === "appVersion") {
     $("appVersion").textContent = `v${data.version}`;
     $("sidebarVersion").textContent = `咏伴 ${data.version} · 让语言在歌声里熟悉`;
@@ -551,27 +631,12 @@ function onEvent(kind, data) {
     $("lyricSource").title = $("lyricSource").textContent;
   } else if (kind === "playback") updatePlayback(data);
   else if (kind === "cloud") {
+    $("libraryConnectCloud").hidden = data.transport === "client";
     if (state.mode !== "cloud") return;
-    $("connection").classList.toggle("online", data.connected);
-    $("connectionLabel").textContent = data.connected
-      ? (data.transport === "client" ? "客户端直连 · 双向同步" : "Windows 媒体同步")
-      : "等待网易云播放";
-    if (data.connected) {
-      updatePlayback(data);
-      $("capabilityNotice").hidden = !!data.hasTimeline;
-      $("capabilityNotice").textContent =
-        "Windows 接口未提供进度。点击左侧“连接客户端”，确认重启网易云后启用双向同步。";
-    } else {
-      updatePlayback({
-        playing: false,
-        position: 0,
-        duration: 0,
-        hasTimeline: false,
-      });
-      $("capabilityNotice").hidden = false;
-      $("capabilityNotice").textContent =
-        data.message || "请先在网易云播放一首歌。";
-    }
+    lastCloud = data;
+    if (data.connected) updatePlayback(data);
+    else updatePlayback({playing: false, position: 0, duration: 0, hasTimeline: false});
+    if (!modalOpen) renderCloudStatus(data);
   } else if (kind === "loop") {
     state.loop = data.enabled ? data.region || state.loop : null;
     $("lineLoop").setAttribute("aria-pressed", String(data.enabled));
@@ -597,17 +662,12 @@ function onEvent(kind, data) {
     $("searchDialog").close();
     updatePlayback({});
   } else if (kind === "dictionary") {
-    if (
-      !state.token ||
-      data.token.text !== state.token.text ||
-      data.token.lemma !== state.token.lemma
-    )
-      return;
+    if (!state.token || data.token.text !== state.token.text || data.token.lemma !== state.token.lemma ||
+      data.token.scope !== state.token.scope || data.token.lineKey !== state.token.lineKey ||
+      data.token.tokenStart !== state.token.tokenStart) return;
     $("dictDefinitions").replaceChildren();
     for (const definition of data.definitions) {
-      const p = document.createElement("p");
-      p.className = "definition";
-      p.textContent = definition;
+      const p = document.createElement("p"); p.className = "definition"; p.textContent = definition;
       $("dictDefinitions").append(p);
     }
     $("dictSource").textContent = data.source + " · " + state.token.source;
@@ -619,6 +679,19 @@ function onEvent(kind, data) {
     $("practiceButton").disabled = !state.lines.length;
     toast(data.message, true);
   }
+}
+function renderCloudStatus(data) {
+    $("connection").classList.toggle("online", data.connected);
+    setText($("connectionLabel"), data.connected
+      ? (data.transport === "client" ? "客户端直连 · 双向同步" : "Windows 媒体同步")
+      : "等待网易云播放");
+    if (data.connected) {
+      $("capabilityNotice").hidden = !!data.hasTimeline;
+      setText($("capabilityNotice"), "Windows 接口未提供进度。点击左侧“连接客户端”，确认重启网易云后启用双向同步。");
+    } else {
+      $("capabilityNotice").hidden = false;
+      setText($("capabilityNotice"), data.message || "请先在网易云播放一首歌。");
+    }
 }
 // 折叠状态和交互偏好沿用桌面持久 profile；缺少新字段时使用新默认值。
 const foldGroups = [["displayFold", "displayGroup"], ["versionsFold", "versionsGroup"], ["infoFold", "infoGroup"]];
@@ -640,7 +713,9 @@ function savePreferences() {
         translation: $("translationToggle").checked,
         dict: state.dict,
         romaji: state.romaji,
+        cantonese: state.cantonese,
         size: $("fontSize").value,
+        lyricFont: state.lyricFont,
         follow: state.follow,
         followMode: state.followMode,
         playOnLyricSeek: state.playOnLyricSeek,
@@ -666,6 +741,27 @@ function display() {
   followCurrent();
   savePreferences();
 }
+// 只改 CSS 字体变量，不重建歌词行；逐字时间、注音、循环与浏览状态均保留。
+const defaultLyricFont = '"Microsoft YaHei", "Yu Gothic", "Segoe UI", sans-serif';
+function applyLyricFont() {
+  const family = state.lyricFont ? JSON.stringify(state.lyricFont) + ", " + defaultLyricFont : defaultLyricFont;
+  document.documentElement.style.setProperty("--lyric-font", family);
+}
+function setLyricFonts(families) {
+  const fonts = [...new Set(families.filter(name => typeof name === "string" && name && !name.startsWith("@")))];
+  fonts.sort((a,b) => a.localeCompare(b, "zh-CN"));
+  const select = $("lyricFont");
+  select.replaceChildren(new Option("默认 · 统一黑体", ""), ...fonts.map(name => new Option(name, name)));
+  const missing = state.lyricFont && !fonts.includes(state.lyricFont);
+  $("lyricFontHint").textContent = missing ? `本机未安装「${state.lyricFont}」，已使用默认字体。可重新选择。` : "使用本机已安装的字体；原文即时预览，注音保持清晰易读的字体。";
+  if (missing) state.lyricFont = "";
+  select.value = state.lyricFont; applyLyricFont(); savePreferences();
+}
+$("lyricFont").onchange = () => {
+  state.lyricFont = $("lyricFont").value;
+  $("lyricFontHint").textContent = "字体已保存，歌词原文即时生效。缺少的字形由系统回退字体补全。";
+  applyLyricFont(); savePreferences();
+};
 $("cloudMode").onclick = () => action("mode", "cloud");
 $("localMode").onclick = () => action("mode", "local");
 $("openAudio").onclick = $("emptyOpen").onclick = () => action("openAudio");
@@ -716,6 +812,7 @@ $("seek").addEventListener("change", () => {
 $("seek").addEventListener("pointercancel", () => (state.dragging = false));
 $("rubyToggle").onchange = $("translationToggle").onchange = display;
 $("romajiToggle").onchange = changeRomaji;
+$("cantoneseToggle").onchange = refreshCantonese;
 $("fontSize").oninput = display;
 $("quickFontSize").oninput = (e) => { $("fontSize").value = e.target.value; display(); };
 $("songVersion").onchange = (e) => action("selectSong", {id: e.target.value});
@@ -832,6 +929,11 @@ $("volume").oninput = () => {
 };
 $("correctButton").onclick = () => {
   if (!state.token) return;
+  state.correctionToken = {...state.token};
+  $("correctError").hidden = true;
+  $("saveReading").disabled = false; $("saveReading").textContent = "保存注音";
+  $("correctTitle").textContent = state.token.language === "zh" ? "修正粤拼" : "修正注音";
+  $("correctReading").placeholder = state.token.language === "zh" ? "例如 ngo5；留空恢复自动读音" : "输入平假名或 IPA，留空恢复自动注音";
   $("correctWord").textContent = "词汇：" + state.token.text;
   $("correctReading").value = state.token.reading;
   $("readingCandidates").replaceChildren();
@@ -849,14 +951,14 @@ $("correctButton").onclick = () => {
 };
 $("correctForm").onsubmit = (e) => {
   e.preventDefault();
+  if (!state.correctionToken || $("saveReading").disabled) return;
+  $("saveReading").disabled = true; $("saveReading").textContent = "正在保存…";
+  $("correctError").hidden = true;
   action("correct", {
-    text: state.token.text,
+    ...state.correctionToken,
     reading: $("correctReading").value,
-    scope: state.token.scope,
-    lineKey: state.token.lineKey,
-    tokenStart: state.token.tokenStart,
+    readingSystem: state.correctionToken.readingSystem || "default",
   });
-  $("correctDialog").close();
 };
 $("dictionaryWeb").onclick = () =>
   action("dictionaryWeb", state.token?.lemma || state.token?.text || "");
@@ -913,9 +1015,13 @@ try {
   // 旧配置缺少此字段时维持默认关闭，先读完全部偏好再持久化。
   state.romaji = p.romaji === true;
   $("romajiToggle").checked = state.romaji;
+  state.cantonese = p.cantonese === true;
+  $("cantoneseToggle").checked = state.cantonese;
   if (p.translation !== undefined)
     $("translationToggle").checked = p.translation;
   if (p.size) $("fontSize").value = p.size;
+  state.lyricFont = typeof p.lyricFont === "string" ? p.lyricFont : "";
+  applyLyricFont();
   if (p.follow !== undefined) $("autoFollow").checked = p.follow;
   if (["advance", "center"].includes(p.followMode)) $("followMode").value = p.followMode;
   for (const key of ["playOnLyricSeek", "resumeAfterBrowse"]) {

@@ -4,11 +4,15 @@
   --sidebar: #eeefe7;
   --ink: #243247;
   --green: #315ec5;
-  --muted: #7b837b;
+  --muted: #667085;
   --line: #dfe2d8;
   --active: #edf2ff;
-  --sun: #bd8150;
+  --sun: #315ec5;
+  --surface: #ffffff;
+  --danger: #a63731;
+  --hover: #e9edf5;
   --lyric-size: 34px;
+  --lyric-font: "Microsoft YaHei", "Yu Gothic", "Segoe UI", sans-serif;
   font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
   color: var(--ink);
   background: var(--paper);
@@ -78,7 +82,7 @@ button svg {
   vertical-align: middle;
 }
 button:active {
-  transform: translateY(1px);
+  background-color: #dce5f8;
 }
 [hidden] {
   display: none !important;
@@ -434,18 +438,18 @@ header p {
   background: var(--active);
 }
 .lyric-original {
-  font-family:
-    "Yu Mincho", "Noto Serif CJK JP", "MS Mincho", "Microsoft YaHei", serif;
+  /* 日文宋体缺少部分简体字时会逐字回退成黑体；统一常规字重避免混粗。 */
+  font-family: var(--lyric-font);
   font-size: var(--lyric-size);
   line-height: 1.65;
   color: #85897e;
   overflow-wrap: anywhere;
-  font-weight: 600;
+  font-weight: 400;
   word-break: normal;
 }
 .lyric-line.active .lyric-original {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 400;
 }
 .token {
   display: inline-block;
@@ -856,8 +860,8 @@ dialog {
   box-shadow: 0 18px 80px #1e3b3228;
 }
 dialog::backdrop {
-  background: #263d3340;
-  backdrop-filter: blur(4px);
+  /* 静态遮罩不采样背后的逐字渐变，避免部分显卡的模糊层合成闪烁。 */
+  background: #17233866;
 }
 .client-setting { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 12px; }
 .client-directory { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; color: var(--ink); margin: 8px 0; }
@@ -889,6 +893,7 @@ dialog form > p {
   margin: 17px 0;
 }
 input[type="text"],
+input[type="search"],
 input:not([type]),
 input[type="number"] {
   border: 1px solid #d2dcca;

@@ -110,28 +110,41 @@ class Annotator:
         except (OSError, ValueError):
             self.scoped = {}
 
-    def correct(self, text: str, reading: str, scope="", line_key="", token_start=0) -> None:
+    def correct(self, text: str, reading: str, scope="", line_key="", token_start=0,
+                reading_system="default") -> None:
+        # 粤拼与旧假名/IPA 使用不同键，开关粤拼不会改写旧版修正的含义。
+        if reading_system == "jyutping":
+            reading = " ".join(reading.lower().split())
+            if reading and not re.fullmatch(r"[a-z]+[1-6](?: [a-z]+[1-6])*", reading):
+                raise ValueError("粤拼请使用字母和 1–6 声调数字，例如 ngo5；留空恢复自动读音。")
         if scope:
-            key = json.dumps([scope, line_key, token_start, text], ensure_ascii=False)
+            parts = [scope, line_key, token_start, text]
+            if reading_system == "jyutping":
+                parts.append("jyutping")
+            key = json.dumps(parts, ensure_ascii=False)
+            scoped = dict(self.scoped)
             if reading.strip():
-                self.scoped[key] = reading.strip()
+                scoped[key] = reading.strip()
             else:
-                self.scoped.pop(key, None)
+                scoped.pop(key, None)
             self.scoped_path.parent.mkdir(parents=True, exist_ok=True)
             temporary = self.scoped_path.with_suffix(".tmp")
-            temporary.write_text(json.dumps(self.scoped, ensure_ascii=False, indent=2), encoding="utf-8")
+            temporary.write_text(json.dumps(scoped, ensure_ascii=False, indent=2), encoding="utf-8")
             temporary.replace(self.scoped_path)
+            self.scoped = scoped
             return
+        overrides = dict(self.overrides)
         if reading.strip():
-            self.overrides[text] = reading.strip()
+            overrides[text] = reading.strip()
         else:
-            self.overrides.pop(text, None)
+            overrides.pop(text, None)
         self.override_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.override_path.with_suffix(".tmp")
         temporary.write_text(
-            json.dumps(self.overrides, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(overrides, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         temporary.replace(self.override_path)
+        self.overrides = overrides
         self.annotate.cache_clear()
 
     def english_token(self, surface: str) -> dict:
@@ -237,7 +250,13 @@ class Annotator:
         return "".join(item["hepburn"] for item in self.kakasi.convert(reading))
 
     def enrich(self, lines: list[dict], scope="") -> list[dict]:
+        # 同一份日语歌词里的纯汉字短句仍按日语处理；中文歌词不再显示日语猜读。
+        # 显式 language=zh 可覆盖此文档级线索；译文不是原文，不参与判定或粤拼转换。
+        japanese_lines = sum(bool(re.search(r"[ぁ-ゖァ-ヶ]", line["text"])) for line in lines)
+        chinese_lines = sum(bool(HAN.search(line["text"])) and not re.search(r"[ぁ-ゖァ-ヶ]", line["text"]) for line in lines)
+        japanese_document = japanese_lines > 0 and japanese_lines >= chinese_lines
         for line in lines:
+            line.pop("cantoneseTokens", None)
             # 缓存里的词典结果不能被歌曲注音 / 用户修正改写。
             tokens = [dict(token) for token in self.annotate(line["text"])]
             readings = align_reading(tokens, line.get("pronunciation", ""))
@@ -293,7 +312,54 @@ class Annotator:
                 cursor += len(token["text"])
             line["tokens"] = tokens
             line["readingSource"] = "song" if readings else "dictionary"
+            chinese = (HAN.search(line["text"]) and not re.search(r"[ぁ-ゖァ-ヶ]", line["text"])
+                       and (not japanese_document or line.get("language") == "zh"))
+            if chinese:
+                line["cantoneseTokens"] = self._cantonese_tokens(line, scope, line_key)
         return lines
+
+    @staticmethod
+    @lru_cache(maxsize=4096)
+    def _cantonese_candidates(text: str) -> tuple:
+        """整句转换后逐字取读音，保留词组上下文，不逐字重新猜多音字。
+
+        延迟导入的离线词典随便携包分发；不向任何在线服务发送歌词。
+        缓存只含不可变元组，用户修正不会污染其他歌曲的结果。
+        """
+        import ToJyutping
+        return tuple((text, tuple(readings)) for text, readings in ToJyutping.get_jyutping_candidates(text))
+
+    def _cantonese_tokens(self, line, scope, line_key):
+        tokens, cursor = [], 0
+        pairs, latin = [], ""
+        for text, readings in self._cantonese_candidates(line["text"]):
+            # ToJyutping 按字返回；先把连续英语重组，避免 CMU 查询变成逐字母注音。
+            if re.fullmatch(r"[A-Za-z'’]+", text):
+                latin += text
+                continue
+            if latin:
+                pairs.append((latin, ()))
+                latin = ""
+            pairs.append((text, readings))
+        if latin:
+            pairs.append((latin, ()))
+        for text, readings in pairs:
+            # 库保留标点、空格和未收录汉字；英语连续串另交给原有 CMU 处理。
+            if re.fullmatch(r"[A-Za-z]+(?:['’][A-Za-z]+)*", text):
+                token = self.english_token(text)
+            else:
+                token = {"text": text, "reading": readings[0] if readings else "",
+                         "language": "zh" if HAN.search(text) else "", "lemma": text,
+                         "pos": "粤语读音", "source": "ToJyutping 离线粤拼" if readings else "未收录读音"}
+            token.update(scope=scope, lineKey=line_key, tokenStart=cursor,
+                         readingSystem="jyutping" if token["language"] == "zh" else "default",
+                         readingCandidates=[{"reading": reading, "source": "粤拼候选"} for reading in readings])
+            key = json.dumps([scope, line_key, cursor, text, "jyutping"], ensure_ascii=False)
+            if scope and key in self.scoped:
+                token["reading"], token["source"] = self.scoped[key], "本句用户校正"
+            tokens.append(token)
+            cursor += len(text)
+        return tokens
 
     @staticmethod
     def _inline_reading(line, token, cursor):

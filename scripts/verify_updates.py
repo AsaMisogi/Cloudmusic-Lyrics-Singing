@@ -22,8 +22,8 @@ def main():
     response = Mock(status_code=200)
     response.__enter__ = Mock(return_value=response)
     response.__exit__ = Mock(return_value=False)
-    response.json.return_value = {"tag_name": "v0.4.0", "draft": False, "prerelease": False}
-    website = Mock(status_code=302, headers={"Location": runtime.REPOSITORY_URL + "/releases/tag/v0.3.0"})
+    response.json.return_value = {"tag_name": "v0.5.0", "draft": False, "prerelease": False}
+    website = Mock(status_code=302, headers={"Location": runtime.REPOSITORY_URL + "/releases/tag/v0.4.0"})
     website.__enter__ = Mock(return_value=website)
     website.__exit__ = Mock(return_value=False)
     with tempfile.TemporaryDirectory() as directory, \
@@ -54,13 +54,13 @@ def main():
 
         def manual_current():
             view.grab().save(str(output / "update-dialog.png"))
-            response.json.return_value["tag_name"] = "v0.3.0"
+            response.json.return_value["tag_name"] = "v0.4.0"
             page.runJavaScript("$('laterUpdate').click(); $('toolsDialog').showModal(); $('checkUpdate').click();")
-            QTimer.singleShot(300, lambda: check("手动检查经后台返回无需更新", "!$('checkUpdate').disabled && $('updateFeedback').textContent.includes('0.3.0') && !$('updateDialog').open", manual_new))
+            QTimer.singleShot(300, lambda: check("手动检查经后台返回无需更新", "!$('checkUpdate').disabled && $('updateFeedback').textContent.includes('0.4.0') && !$('updateDialog').open", manual_new))
 
         def manual_new():
             view.grab().save(str(output / "update-settings.png"))
-            response.json.return_value["tag_name"] = "v0.4.0"
+            response.json.return_value["tag_name"] = "v0.5.0"
             page.runJavaScript("$('checkUpdate').click();")
             QTimer.singleShot(300, lambda: check("手动新版本经 WebChannel 自动弹窗", "$('updateDialog').open && !$('toolsDialog').open", download))
 
@@ -69,7 +69,7 @@ def main():
             QTimer.singleShot(100, verify_browser)
 
         def verify_browser():
-            checks.append({"check": "下载仅打开后端固定仓库版本页", "passed": browser.call_count == 1 and browser.call_args.args[0].toString() == runtime.REPOSITORY_URL + "/releases/tag/v0.4.0"})
+            checks.append({"check": "下载仅打开后端固定仓库版本页", "passed": browser.call_count == 1 and browser.call_args.args[0].toString() == runtime.REPOSITORY_URL + "/releases/tag/v0.5.0"})
             response.status_code = 429
             page.runJavaScript("$('toolsDialog').showModal(); $('checkUpdate').click();")
             QTimer.singleShot(300, lambda: check("API 限流后官网后备检查成功且按钮恢复", "!$('checkUpdate').disabled && $('updateFeedback').textContent.includes('无需更新') && !$('updateDialog').open", both_unavailable))
@@ -117,11 +117,11 @@ def main():
             app.exit(0 if all(c["passed"] for c in checks) and not result["errors"] else 1)
 
         def startup():
-            check("启动检查完成但等待首次路径引导", "$('clientPathDialog').open && !$('updateDialog').open && pendingUpdate?.version==='0.4.0'", close_setup)
+            check("启动检查完成但等待首次路径引导", "$('clientPathDialog').open && !$('updateDialog').open && pendingUpdate?.version==='0.5.0'", close_setup)
 
         def close_setup():
             page.runJavaScript("$('cancelClientPath').click();")
-            QTimer.singleShot(100, lambda: check("引导结束后自动提示新版本", "$('updateDialog').open && $('updateDescription').textContent.includes('0.3.0')", manual_current))
+            QTimer.singleShot(100, lambda: check("引导结束后自动提示新版本", "$('updateDialog').open && $('updateDescription').textContent.includes('0.4.0')", manual_current))
 
         page.loadFinished.connect(lambda ok: QTimer.singleShot(700, startup) if ok else app.exit(2))
         view.setUrl(QUrl.fromLocalFile(str(ROOT / "web/index.html")))

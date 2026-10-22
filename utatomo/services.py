@@ -129,6 +129,19 @@ class Services:
             for song in data.get("result", {}).get("songs", [])
         ]
 
+    def song_detail(self, song_id: str) -> dict:
+        """收藏链接时只取曲目元数据；不下载音频、不获取账号凭据。"""
+        if not re.fullmatch(r"[1-9]\d{0,19}", song_id):
+            raise ValueError("请输入网易云歌曲 ID 或完整歌曲链接。")
+        data = self.request("https://music.163.com/api/song/detail/", {"ids": "[" + song_id + "]"})
+        song = next((s for s in data.get("songs", []) if str(s.get("id")) == song_id), None)
+        if not song:
+            raise ValueError("未找到这首歌，请核对歌曲 ID。")
+        return {"songId": song_id, "title": song["name"],
+                "artist": " / ".join(a["name"] for a in song.get("artists", song.get("ar", []))),
+                "album": song.get("album", song.get("al", {})).get("name", ""),
+                "duration": song.get("duration", song.get("dt", 0))}
+
     def identify(self, title: str, artist: str) -> list[dict]:
         """优先只读当前播放队列，取歌曲 ID；不读取账户、Cookie 或播放历史。"""
         normalize = lambda text: re.sub(

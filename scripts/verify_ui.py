@@ -9,13 +9,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from utatomo.app import LocalPage  # 同正式入口使用相同的 Chromium 刷新设置。
-from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtCore import QTimer, QUrl, Qt
 from PySide6.QtWebEngineCore import QWebEngineProfile
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
 
 app = QApplication([])
 view = QWebEngineView()
+if "--headless" in sys.argv:
+    view.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
 view.resize(960, 700)
 profile = QWebEngineProfile(view)
 page = LocalPage(profile, view)
@@ -33,6 +35,12 @@ def start(ok):
 
 def poll():
     page.runJavaScript("JSON.stringify(window.__uiResult || null)", finish)
+    page.runJavaScript("window.__uiCapture || ''", capture)
+
+
+def capture(name):
+    if name in {"library", "settings"}:
+        view.grab().save(str(output / f"ui-{name}.png"))
 
 def finish(raw):
     if not raw or raw == "null":

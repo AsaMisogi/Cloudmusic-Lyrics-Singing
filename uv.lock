@@ -326,6 +326,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tojyutping"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/fe/d10b672782478e87b687779d7303c35d763132cf1b04ad4209c95eb7de4a/tojyutping-3.2.0.tar.gz", hash = "sha256:3a78560ff83716294bb87e88117e8f81ea3b4ef6fc6e9a54411d0e1dd356b6f0", size = 302121, upload-time = "2024-09-24T23:49:08.471Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/73/232b2ddc09db98b1ae37df6aebffa9c4808196e588d73f40cd6d26596cb7/ToJyutping-3.2.0-py3-none-any.whl", hash = "sha256:af7fe10095a3ce91b5cf2bcd7e7c62002407f432c3083562f725ddc140c6fd7e", size = 287884, upload-time = "2024-09-24T23:49:06.286Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -351,7 +360,7 @@ wheels = [
 
 [[package]]
 name = "utatomo"
-version = "0.3.0"
+version = "0.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cmudict" },
@@ -360,6 +369,7 @@ dependencies = [
     { name = "pykakasi" },
     { name = "pyside6" },
     { name = "requests" },
+    { name = "tojyutping" },
     { name = "unidic-lite" },
     { name = "websocket-client" },
     { name = "winrt-runtime", marker = "sys_platform == 'win32'" },
@@ -381,6 +391,7 @@ requires-dist = [
     { name = "pykakasi", specifier = ">=2.3,<3" },
     { name = "pyside6", specifier = ">=6.8,<6.11" },
     { name = "requests", specifier = ">=2.32,<3" },
+    { name = "tojyutping", specifier = "==3.2.0" },
     { name = "unidic-lite", specifier = "==1.0.8" },
     { name = "websocket-client", specifier = ">=1.8,<2" },
     { name = "winrt-runtime", marker = "sys_platform == 'win32'", specifier = ">=3,<4" },

@@ -62,7 +62,7 @@ def main():
         shutil.copy2(ROOT / "LICENSE", bundle / "LICENSE")
     # The README's relative image links also work in the extracted archive.
     shutil.copytree(ROOT / "docs/images", bundle / "docs/images", dirs_exist_ok=True)
-    for name in ("architecture.md", "third-party.md", "verification.md"):
+    for name in ("architecture.md", "third-party.md", "verification.md", "design.md", "release-0.4.0.md"):
         shutil.copy2(ROOT / "docs" / name, bundle / "docs" / name)
     version = __import__("tomllib").loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     archive = dist_dir / f"Utatomo-{version}-windows-x64.zip"

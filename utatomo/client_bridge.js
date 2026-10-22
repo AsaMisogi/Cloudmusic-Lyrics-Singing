@@ -38,6 +38,13 @@
   }
   async function command(name, value, expectedId) {
     const p = player(), state = snapshot();
+    if (name === 'playSong') {
+      if (!p || !/^[1-9]\d{0,19}$/.test(String(value))) throw Error('播放器未就绪或歌曲 ID 无效。');
+      // 只派发固定播放消息，跳过启动 IPC 的 app/activeWindow 订阅。
+      // 不传入 webset/YouDaoDict channel，避免客户端展开唱片页。
+      await p.props.dispatch({type:'async:action/onWebMessage', payload:{message:{cmd:'play',type:'song',id:String(value)}}});
+      return true; // 实际成功仍由后续媒体快照确认，不能把派发当作已播放。
+    }
     if (!p || !state || (expectedId && state.songId !== expectedId)) throw Error('歌曲已切换，请重试操作。');
     if (name === 'seek' || name === 'seekAndPlay') {
       if (!state.canSeek || !Number.isFinite(value)) throw Error('当前歌曲不可跳转。');

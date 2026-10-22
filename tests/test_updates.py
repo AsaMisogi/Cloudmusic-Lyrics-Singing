@@ -177,8 +177,9 @@ class UpdateTests(unittest.TestCase):
         bridge.update_started = False
         bridge._send_client_settings = Mock()
         bridge._send_versions = Mock()
+        bridge._send_library = Mock()
         bridge._check_update = Mock()
-        with patch("utatomo.app.sys.argv", ["main.py"]):
+        with patch("utatomo.app.sys.argv", ["main.py"]), patch("utatomo.app.QFontDatabase.families", return_value=["Microsoft YaHei"]):
             Bridge.initialize(bridge)
             Bridge.initialize(bridge)
         self.assertTrue(bridge.ready)

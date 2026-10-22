@@ -11,7 +11,7 @@ datas += [(str(root / "assets" / name), "assets") for name in
 datas += [(str(root / "utatomo/client_bridge.js"), "utatomo")]
 binaries = []
 hiddenimports = []
-for package in ("unidic_lite", "cmudict", "pykakasi", "fugashi"):
+for package in ("unidic_lite", "cmudict", "pykakasi", "fugashi", "ToJyutping"):
     package_datas, package_binaries, package_imports = collect_all(package)
     datas += package_datas
     binaries += package_binaries

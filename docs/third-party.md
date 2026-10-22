@@ -12,6 +12,7 @@
 | UniDic Lite | 日语词典 | [polm/unidic-lite](https://github.com/polm/unidic-lite)，词库使用其原始 BSD / GPL / LGPL 许可说明 |
 | pykakasi | 未登录词常用读音回退 | [miurahr/pykakasi](https://github.com/miurahr/pykakasi)，GPLv3 |
 | cmudict / CMUdict | 英语词典发音 | [cmusphinx/cmudict](https://github.com/cmusphinx/cmudict)，BSD 风格许可 |
+| ToJyutping 3.2.0 | 简繁中文的离线粤拼及词组上下文候选 | [CanCLID/ToJyutping](https://github.com/CanCLID/ToJyutping)，BSD 2-Clause；词典 `trie.txt` 随包分发 |
 | PyWinRT | Windows 系统媒体会话 | [pywinrt](https://github.com/pywinrt/pywinrt)，MIT |
 | Requests | 网络请求 | [psf/requests](https://github.com/psf/requests)，Apache 2.0 |
 | websocket-client | 网易云本机 CDP 通道 | [websocket-client](https://github.com/websocket-client/websocket-client)，Apache 2.0 |
@@ -28,6 +29,7 @@
 - MyMemory：[API 说明](https://mymemory.translated.net/doc/spec.php)，Google 不可用时的备用机译服务，有访问与配额限制。
 - Windows 系统媒体会话：[Microsoft 文档](https://learn.microsoft.com/en-us/uwp/api/windows.media.control)。
 - 本机连接参考：[Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/)；[NeteaseHookSDK](https://github.com/lgnorant-lu/NeteaseHookSDK) 用于确认客户端支持 CDP。项目没有安装其 DLL 或复制其实现，播放适配基于本机客户端组件实测。
+- 曲库切歌协议：依据本机网易云 3.1.41.205529 未加密的安装资源中 `getAppStartCommand`、`onWebMessage` 与协议解析器确认 Windows 启动消息格式，并经实际切歌验证。只构造固定的 `play/song` 消息，不随包分发客户端代码。
 - 高刷新率设置：[Qt WebEngine 调试参数文档](https://doc.qt.io/qt-6/qtwebengine-debugging.html)；`--disable-frame-rate-limit` 的效果由本项目真实 Qt 验收采样确认。
 
 ## 原创资产

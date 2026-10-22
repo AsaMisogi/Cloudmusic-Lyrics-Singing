@@ -11,6 +11,7 @@ from ctypes import wintypes
 import json
 import logging
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -18,6 +19,30 @@ import sys
 import psutil
 
 LOG = logging.getLogger(__name__)
+
+
+def play_cloud_song(directory: str, song_id: str) -> None:
+    """经现有本机直连通道发送播放动作，不启动程序、不激活窗口。
+
+    --webcmd 会触发客户端 app/activeWindow；CREATE_NO_WINDOW 只能隐藏
+    控制台，不能阻止它唤起已有 GUI。这里不再走启动协议或事后抢回焦点。
+    普通 SMTC 没有按 ID 切歌接口，须由用户通过「连接客户端」启用直连。
+    独立短连接在调用方的工作线程中使用，不与媒体轮询共享 WebSocket。
+    """
+    if not re.fullmatch(r"[1-9]\d{0,19}", str(song_id)):
+        raise ValueError("网易云歌曲 ID 无效。")
+    client_executable(directory)
+    from .client import ClientConnection
+    connection = ClientConnection()
+    try:
+        try:
+            connection.connect()
+        except Exception as exc:
+            raise ValueError("后台切歌需要直连通道，请点击「连接客户端」完成连接后重试；不会唤起窗口切歌。") from exc
+        connection.command("playSong", str(song_id))
+    finally:
+        connection.close()
+        connection.http.close()
 
 
 def client_executable(value: str | Path) -> Path:
