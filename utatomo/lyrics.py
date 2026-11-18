@@ -119,7 +119,7 @@ def parse_lyrics(text: str) -> list[dict]:
                 )
     if not lines:
         # 无时间文本只展示，不捏造歌曲时间，也不允许点击跳转。
-        return [
+        plain = [
             {
                 "start": None,
                 "end": None,
@@ -131,6 +131,9 @@ def parse_lyrics(text: str) -> list[dict]:
             for row in text.splitlines()
             if row.strip() and not re.match(r"^\[\w+:", row)
         ]
+        for line in plain:
+            extract_inline_readings(line)
+        return plain
     lines.sort(key=lambda line: line["start"])
     merged: list[dict] = []
     for line in lines:

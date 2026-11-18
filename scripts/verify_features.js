@@ -75,12 +75,16 @@
   check('取消最爱保留原歌单成员', libraryUI.data.playlists[0]?.count===3);
   $('libraryDialog').close();
   $('playlistCurrent').click(); $('playlistPickerList').querySelector('button').click();
-  await until('封面下快捷歌单真实保存且不会自动红心', ()=>!$('playlistPickerDialog').open && libraryUI.current?.favorite===false);
+  await until('底栏快捷歌单真实保存且不会自动红心', ()=>!$('playlistPickerDialog').open && libraryUI.current?.favorite===false);
   await until('字体下拉包含真实 Qt 本机字体', ()=>$('lyricFont').options.length>10);
   $('lyricFont').value='Microsoft YaHei'; $('lyricFont').dispatchEvent(new Event('change'));
   check('真实本机字体选择即时应用歌词', getComputedStyle(lyricRows[0].querySelector('.lyric-original')).fontFamily.startsWith('"Microsoft YaHei"'));
   // 将完整报告保存在 sessionStorage，重载走正式初始化路径检查显示偏好。
   window.__featureBeforeReload=checks;
   sessionStorage.setItem('feature-checks',JSON.stringify(checks));
+  // 用旧版真实字段形状做一次升级：已收起显示区的老用户仍需看见五个开关。
+  const oldPrefs=JSON.parse(localStorage.getItem('utatomo-display'));
+  oldPrefs.collapsed={displayGroup:true,infoGroup:true,versionsGroup:true};
+  localStorage.setItem('utatomo-display',JSON.stringify(oldPrefs));
   window.__featureReadyToReload=true;
 })().catch(error=>{ window.__featureResult={checks:[],errors:[String(error),...window.__errors]}; });

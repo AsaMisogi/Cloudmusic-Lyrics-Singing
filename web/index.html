@@ -13,7 +13,10 @@
     <link rel="stylesheet" href="library.css" />
     <script src="qrc:///qtwebchannel/qwebchannel.js" defer></script>
     <script src="playback-clock.js" defer></script>
+    <link rel="stylesheet" href="studio.css" />
+    <script src="theme.js" defer></script>
     <script src="app.js" defer></script>
+    <script src="practice.js" defer></script>
     <script src="library.js" defer></script>
   </head>
   <body>
@@ -54,112 +57,84 @@
         </symbol>
         <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7m2-5v6l4 2" /></symbol>
         <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20 5c-2-2-5-2-8 1-3-3-6-3-8-1s-2 5 0 7l8 8 8-8c2-2 2-5 0-7Z" /></symbol>
+        <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12m0-12H9a2.5 2.5 0 1 1 2.4-3.2L12 8Zm0 0h3a2.5 2.5 0 1 0-2.4-3.2L12 8Z"/></symbol>
         <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M3 6h1m-1 6h1m-1 6h1" /></symbol>
         <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" /></symbol>
         <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" /></symbol>
         <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z" /></symbol>
+        <symbol id="i-screen" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="3"/><path d="M8 21h8m-4-4v4M6 12l3-3 3 3 5-5"/></symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h6m4 0h6M4 17h10m4 0h2"/><circle cx="12" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 14 4-4m-2-3 2-2a4 4 0 0 1 6 6l-3 3m-5 3-2 2a4 4 0 0 1-6-6l3-3"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-11v2"/></symbol>
+        <symbol id="i-align" viewBox="0 0 24 24"><path d="M3 5h18M7 10h10M3 15h18M7 20h10"/></symbol>
       </defs>
     </svg>
-    <aside class="sidebar">
-      <div class="brand">
-        <img src="../assets/icon.svg" alt="咏伴图标" />
-        <div><strong>咏伴</strong><span>U T A T O M O</span></div>
-      </div>
-      <nav aria-label="播放来源">
-        <button id="cloudMode" class="nav-item selected">
-          <svg><use href="#i-cloud" /></svg>网易云同步<span
-            class="nav-dot"
-          ></span>
-        </button>
-        <button id="localMode" class="nav-item">
-          <svg><use href="#i-music" /></svg>本地歌曲
-        </button>
+    <aside class="sidebar" aria-label="导航与播放来源">
+      <div class="brand"><img src="../assets/icon.svg" alt="" /><strong>咏伴</strong></div>
+      <h2 class="rail-heading">播放来源</h2>
+      <nav class="source-tabs" aria-label="播放来源">
+        <button id="cloudMode" aria-label="网易云同步" aria-pressed="true" title="跟随网易云播放"><svg aria-hidden="true"><use href="#i-cloud" /></svg>网易云</button>
+        <button id="localMode" aria-label="本地歌曲" aria-pressed="false" title="切换到本地播放器"><svg aria-hidden="true"><use href="#i-music" /></svg>本地</button>
       </nav>
-      <nav class="library-nav" aria-label="我的曲库">
+      <div class="source-actions">
+        <button id="connectCloud" title="连接本机网易云；需要重启时会先询问"><svg aria-hidden="true"><use href="#i-link" /></svg><span id="connectLabel">连接客户端</span></button>
+        <button id="openAudio"><svg aria-hidden="true"><use href="#i-folder" /></svg>打开本地音频</button>
+        <button id="practiceButton" title="使用当前曲目的客户端音频练唱" disabled><svg aria-hidden="true"><use href="#i-play" /></svg>同步练唱</button>
+      </div>
+      <h2 class="rail-heading">音乐库</h2><nav class="library-nav" aria-label="我的曲库">
         <button id="recentButton" class="nav-item"><svg aria-hidden="true"><use href="#i-history" /></svg>最近播放<span id="recentCount" class="nav-count">0</span></button>
         <button id="libraryButton" class="nav-item"><svg aria-hidden="true"><use href="#i-heart" /></svg>曲库收藏</button>
       </nav>
-      <div class="sidebar-rule"></div>
-      <div class="album">
-        <img
-          id="albumCover" src="../assets/landscape.svg"
-          alt="日光与山峦的原创默认封面"
-        /><span id="coverCaption">每一遍，都更靠近。</span>
-      </div>
-      <div class="track-info">
-        <span class="eyebrow">NOW LEARNING</span>
-        <div class="track-title-row"><h2 id="trackTitle">等待音乐响起</h2></div>
-        <p id="trackArtist">在网易云播放一首喜欢的歌</p>
-        <div class="current-track-actions">
-          <button id="favoriteCurrent" class="favorite-button outline-button" aria-label="将当前歌曲加入最爱" aria-pressed="false" title="将当前歌曲加入最爱" disabled><svg aria-hidden="true"><use href="#i-heart" /></svg><span id="favoriteCurrentLabel">最爱</span></button>
-          <button id="playlistCurrent" class="outline-button" title="将当前歌曲加入工具歌单" disabled><svg aria-hidden="true"><use href="#i-plus" /></svg>加入歌单</button>
-        </div>
-      </div>
-      <div id="connection" class="connection">
-        <span class="status-dot"></span
-        ><span id="connectionLabel">正在连接网易云</span>
-      </div>
-      <button id="practiceButton" class="primary-button practice-button">
-        同步练唱
-      </button>
-      <button id="connectCloud" class="outline-button" title="启用本机双向同步；网易云已运行时会先询问是否重启">连接客户端</button>
-      <button id="openAudio" class="outline-button">
-        <svg><use href="#i-folder" /></svg>打开本地音频
-      </button>
       <div class="sidebar-bottom">
-        <button id="helpButton" class="text-button">
-          <svg><use href="#i-help" /></svg>使用指南与快捷键</button
-        ><button id="author" class="author">
-          由 @朝禊ASOGI 制作 <span>↗</span></button
-        ><button id="github" class="author" title="在系统浏览器打开项目源码与反馈页">GitHub 项目 <span>↗</span></button>
-        <span id="sidebarVersion" class="version">咏伴 · 让语言在歌声里熟悉</span>
+        <button id="statusButton" class="nav-item" popovertarget="sessionStatus"><svg aria-hidden="true"><use href="#i-info" /></svg>播放信息</button>
+        <button id="helpButton" class="nav-item"><svg aria-hidden="true"><use href="#i-help" /></svg>使用指南</button>
+        <button id="moreButton" class="nav-item"><svg aria-hidden="true"><use href="#i-settings" /></svg>设置</button>
+        <button id="supportButton" class="nav-item" type="button" aria-haspopup="dialog" aria-controls="supportDialog"><svg aria-hidden="true"><use href="#i-gift" /></svg>赞赏作者</button>
       </div>
+      <section id="sessionStatus" popover aria-labelledby="statusTitle">
+        <div class="status-head"><h2 id="statusTitle">播放信息</h2>
+          <button class="icon-button small" aria-label="关闭播放信息" popovertarget="sessionStatus" popovertargetaction="hide">×</button></div>
+        <dl><dt>连接方式</dt><dd id="connection" class="connection"><span class="status-dot"></span><span id="connectionLabel">等待网易云播放</span></dd>
+          <dt>歌词来源</dt><dd id="lyricSource">等待加载歌词</dd>
+          <dt>时间轴与注音</dt><dd id="timingHint">等待时间轴</dd>
+          <dt>当前句</dt><dd id="lyricCounter">— / —</dd></dl>
+        <p id="capabilityNotice" hidden></p>
+      </section>
     </aside>
     <main>
-      <!-- 常驻操作只保留折叠入口、搜索和设置，折叠后仍能访问全局设置。 -->
-      <div class="top-actions">
-        <button id="displayFold" class="fold-button" aria-expanded="true" aria-controls="displayGroup">显示选项 <span>▾</span></button>
-        <button id="versionsFold" class="fold-button" aria-expanded="true" aria-controls="versionsGroup">版本与跟随 <span>▾</span></button>
-        <button id="infoFold" class="fold-button" aria-expanded="true" aria-controls="infoGroup">状态信息 <span>▾</span></button>
-        <div class="player-spacer"></div>
-        <button id="searchButton" class="icon-button small" title="搜索歌词" aria-label="搜索歌词"><svg><use href="#i-search" /></svg></button>
-        <button id="moreButton" class="settings-button" title="全局设置">设置</button>
-      </div>
-      <div id="displayGroup">
-      <section class="toolbar" aria-label="歌词显示设置">
-        <div class="display-switches">
-          <label
-            ><input id="rubyToggle" type="checkbox" checked /><span
-              >显示注音</span
-            ></label
-          ><label
-            ><input id="translationToggle" type="checkbox" checked /><span
-              >中文译文</span
-            ></label
-          >
-          <label><input id="romajiToggle" type="checkbox" /><span>日语罗马音</span></label>
-          <label><input id="cantoneseToggle" type="checkbox" /><span>中文粤拼</span></label>
+      <!-- 高频练唱开关始终与标题同排；只折叠低频的版本、时间轴与跟随选项。 -->
+      <header class="score-bar">
+        <h1>练唱谱</h1>
+        <div class="display-switches" role="group" aria-label="歌词显示与查词">
+          <label title="显示原文上方的注音"><input id="rubyToggle" type="checkbox" aria-label="显示原文上方的注音" checked /><span>注音</span></label>
+          <label title="显示中文译文"><input id="translationToggle" type="checkbox" aria-label="显示中文译文" checked /><span>译文</span></label>
+          <label title="日语注音切换为罗马音"><input id="romajiToggle" type="checkbox" aria-label="日语注音切换为罗马音" /><span>罗马音</span></label>
+          <label title="为中文原文显示粤拼"><input id="cantoneseToggle" type="checkbox" aria-label="为中文原文显示粤拼" /><span>粤拼</span></label>
+          <label title="点击歌词里的词，查看释义或手动修正注音"><input id="dictionaryToggle" type="checkbox" aria-label="点击歌词里的词，查看释义或手动修正注音" /><span><svg aria-hidden="true"><use href="#i-book" /></svg>查词与修正注音</span></label>
         </div>
-        <label class="dictionary-switch"
-          ><svg><use href="#i-book" /></svg><span>词典模式</span
-          ><input id="dictionaryToggle" type="checkbox" /><span
-            class="switch"
-          ></span></label
-        >
-      </section>
-      </div>
-      <div id="versionsGroup">
+          <label class="score-size">字号 <input id="quickFontSize" type="range" min="20" max="64" value="34" aria-label="歌词字号" /><output id="quickFontLabel">34</output></label>
+        <div class="score-tools">
+          <button id="versionsFold" class="score-tool" aria-expanded="false" aria-controls="versionsGroup" title="歌曲版本、时间轴与跟随">版本与跟随 <svg class="disclosure" aria-hidden="true" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></button>
+          <button id="alignment" class="score-tool" title="切换歌词对齐方式"><svg aria-hidden="true"><use href="#i-align" /></svg><span>居中</span></button>
+          <button id="searchButton" class="score-tool search-tool" title="搜索歌词" aria-label="搜索歌词"><svg aria-hidden="true"><use href="#i-search" /></svg></button>
+          <button id="importMenu" class="import-trigger" popovertarget="importPopover"><svg aria-hidden="true"><use href="#i-plus" /></svg>导入歌词</button>
+        </div>
+        <div id="importPopover" popover><button id="importLyrics" class="nav-item"><svg><use href="#i-folder"/></svg>导入歌词文件</button>
+        <button id="pasteOpen" class="nav-item"><svg><use href="#i-list"/></svg>粘贴歌词</button>
+        <button id="importTranslation" class="nav-item"><svg><use href="#i-book"/></svg>导入译文</button><button id="translate" class="nav-item">补充中文机译</button></div>
+        <button id="segmentsOpen" class="sr-only" tabindex="-1">编辑当前句</button>
+      </header>
+      <div id="versionsGroup" hidden>
       <section class="reading-toolbar" aria-label="歌词版本与跟随设置">
         <label>歌曲版本 <select id="songVersion" aria-label="歌曲歌词版本" disabled><option>等待匹配</option></select></label>
         <label>时间轴 <select id="lyricVersion" aria-label="歌词时间轴版本" disabled><option>等待歌词</option></select></label>
         <div class="reading-options">
           <label><input id="autoFollow" type="checkbox" checked /> 自动跟随</label>
           <select id="followMode" aria-label="歌词跟随模式"><option value="advance">向下跟随</option><option value="center">当前句居中</option></select>
-          <label class="font-control">字号 <input id="quickFontSize" type="range" min="20" max="64" value="34" aria-label="歌词字号" /><output id="quickFontLabel">34</output></label>
+
         </div>
       </section>
       </div>
-      <div id="infoGroup"><div id="capabilityNotice" class="capability-notice" hidden></div></div>
       <div class="workspace">
         <section
           id="lyricViewport"
@@ -170,26 +145,23 @@
           <div id="lyrics" class="lyrics"></div>
           <div id="empty" class="empty">
             <div class="empty-orbit">
-              <img src="../assets/icon.svg" alt="" />
+              <img src="../assets/sleeve.svg" alt="" />
             </div>
-            <span class="eyebrow">ONE SONG, ONE SMALL STEP</span>
-            <h2>把喜欢的歌，慢慢唱会。</h2>
+
+            <h2>打开一首歌开始练唱</h2>
             <p id="emptyHint">
-              在网易云播放音乐，歌词会自动来到这里。<br />也可以打开本地歌曲，开始属于你的练唱时间。
+              在网易云播放音乐，或打开本地音频。<br />想先试试注音和查词？从示例开始。
             </p>
             <div>
-              <button id="emptyOpen" class="primary-button">打开本地歌曲</button
-              ><button id="demoButton" class="text-button">体验示例 ↗</button>
+              <button id="emptyOpen" class="outline-button">打开本地歌曲</button
+              ><button id="demoButton" class="primary-button">体验示例</button>
             </div>
-            <span class="empty-caption"
-              >日语假名 · 英语音标 · 双语歌词 · 精细跟唱</span
-            >
+
           </div>
         </section>
         <aside id="dictionaryPanel" class="dictionary-panel" hidden>
-          <div class="dict-heading">
-            <span class="eyebrow">WORD NOTES</span
-            ><button
+          <div class="dict-heading"><strong>查词与修正注音</strong>
+            <button
               id="closeDictionary"
               aria-label="关闭词典"
               class="icon-button small"
@@ -199,8 +171,8 @@
           </div>
           <div id="dictEmpty">
             <svg><use href="#i-book" /></svg>
-            <h3>遇见一个词</h3>
-            <p>点击歌词中的词汇，<br />看看它的读音与含义。</p>
+            <h3>点选歌词里的词</h3>
+            <p>可查看释义、修正这首歌里的读音。按住 Shift 点击仍可跳转。</p>
           </div>
           <div id="dictContent" hidden>
             <h2 id="dictWord"></h2>
@@ -210,23 +182,26 @@
             <div id="dictDefinitions"></div>
             <p id="dictSource" class="muted"></p>
             <button id="correctButton" class="text-button">
-              修正这个词的注音 ↗</button
+              修正注音</button
             ><button id="dictionaryWeb" class="text-button">
-              在在线词典中查看 ↗
+              打开在线词典 ↗
             </button>
           </div>
-          <p class="dict-footnote">
-            注音优先参考歌曲读音；<br />缺少资料时使用本地词库。
-          </p>
+
         </aside>
+        <button id="followButton" class="return-to-line" hidden>回到当前歌词 ↓</button>
       </div>
-      <div class="lyric-footer">
-        <span id="lyricSource">等待加载歌词</span
-        ><button id="followButton" class="text-button" hidden>
-          回到当前歌词 ↓</button
-        ><span id="lyricCounter">— / —</span>
+    </main>
+    <!-- 歌曲身份与播放控制共用固定底栏；长标题省略，不挤压时间轴或把控件推到窗口外。 -->
+    <section class="player" aria-label="当前歌曲与播放控制">
+      <div class="now-playing">
+        <img id="albumCover" src="../assets/sleeve.svg" alt="当前歌曲封面" />
+        <div class="track-info"><h2 id="trackTitle">尚未播放</h2><p id="trackArtist">选择歌曲后开始练唱</p></div>
+        <div class="current-track-actions">
+          <button id="favoriteCurrent" class="favorite-button" aria-label="将当前歌曲加入最爱" aria-pressed="false" title="将当前歌曲加入最爱" disabled><svg aria-hidden="true"><use href="#i-heart" /></svg><span id="favoriteCurrentLabel" class="sr-only">最爱</span></button>
+          <button id="playlistCurrent" aria-label="加入歌单" title="将当前歌曲加入工具歌单" disabled><svg aria-hidden="true"><use href="#i-plus" /></svg></button>
+        </div>
       </div>
-      <section class="player" aria-label="播放控制">
         <div class="seek-row">
           <output id="position">00:00.000</output
           ><input
@@ -241,6 +216,14 @@
           /><output id="duration">00:00.000</output>
         </div>
         <div class="player-controls">
+          <button
+            id="lineLoop"
+            class="loop-button"
+            aria-pressed="false"
+            title="循环当前句（L）"
+          >
+            <svg><use href="#i-repeat" /></svg><span>一句循环</span>
+          </button>
           <div class="transport">
             <button
               id="previousLine"
@@ -265,23 +248,24 @@
               <svg><use href="#i-next" /></svg>
             </button>
           </div>
-          <div class="control-divider"></div>
-          <button
-            id="lineLoop"
-            class="loop-button"
-            aria-pressed="false"
-            title="循环当前句（L）"
-          >
-            <svg><use href="#i-repeat" /></svg><span>一句循环</span>
-          </button>
           <div class="ab-controls">
-            <button id="setA" title="设置循环起点（[）">A</button><span>—</span
-            ><button id="setB" title="设置循环终点（]）">B</button
-            ><button id="clearLoop" title="清除循环" aria-label="清除循环">
+            <button id="setA" title="以当前位置作为区间循环起点（[）">循环起点</button><span>—</span
+            ><button id="setB" title="设置终点并循环所选区间（]）">终点</button
+            ><button id="clearLoop" disabled title="清除循环" aria-label="清除循环">
               ×
             </button>
           </div>
-          <div class="player-spacer"></div>
+          </div>
+          <div class="deck-tools">
+          <div class="desktop-pair" role="group" aria-label="桌面歌词控制"><button id="desktopQuick" class="settings-button" aria-pressed="false" title="显示或隐藏桌面歌词"><svg><use href="#i-screen"/></svg>桌面歌词</button>
+            <label class="quick-pin" title="固定歌词位置并穿透鼠标；悬停三秒可解锁"><input id="pinQuick" type="checkbox" data-desk="pinned" aria-label="钉住桌面歌词">钉住</label>
+          </div>
+          <button id="volumeButton" class="score-tool" popovertarget="playerVolumePanel" aria-label="播放音量" title="调节当前播放来源的音量"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h4l5-4v14l-5-4H3Zm13-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg>音量</button>
+          <section id="playerVolumePanel" popover aria-labelledby="mixerTitle">
+            <div><strong id="mixerTitle">播放音量</strong><output id="mixerLevel" for="mixerSlider">—</output></div>
+            <input id="mixerSlider" type="range" min="0" max="100" aria-label="当前来源音量" disabled />
+            <p id="mixerHint" role="status"></p>
+          </section>
           <label class="speed-label"
             >速度<select id="speed" aria-label="播放速度">
               <option value="0.5">0.5×</option>
@@ -301,7 +285,7 @@
               aria-label="后退 0.1 秒"
             >
               −</button
-            ><span>0.1 s</span
+            ><span>微调 0.1 秒</span
             ><button
               id="nudgeForward"
               title="前进 0.1 秒；Shift 为 0.01 秒"
@@ -311,19 +295,14 @@
             </button>
           </div>
         </div>
-        <div class="player-hints">
-          <span id="loopHint"
-            >空格 播放 / 暂停 <i>·</i> ← → 微调 <i>·</i> 点击歌词跳转</span
-          ><span id="timingHint">毫秒定位 · 从容练唱</span>
-        </div>
-      </section>
-    </main>
+      <output id="loopHint" hidden></output>
+    </section>
     <div id="toast" role="status" hidden></div>
     <dialog id="searchDialog" aria-labelledby="searchTitle">
       <form id="searchForm">
         <div class="modal-title">
           <div>
-            <span class="eyebrow">FIND THE WORDS</span>
+
             <h2 id="searchTitle">找到这首歌的歌词</h2>
           </div>
           <button
@@ -351,34 +330,12 @@
     </dialog>
     <dialog id="toolsDialog" aria-labelledby="toolsTitle">
       <div class="modal-title">
-        <h2 id="toolsTitle">设置与歌词工具</h2>
+        <h2 id="toolsTitle">设置</h2>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
-      <section class="app-update" aria-labelledby="updateSettingTitle">
-        <div class="setting-row"><strong id="updateSettingTitle">应用更新 <span id="appVersion" class="muted"></span></strong><button id="checkUpdate" class="outline-button">检查更新</button></div>
-        <p id="updateFeedback" class="muted" role="status" aria-live="polite">每次启动自动检查正式版本，有更新时提示前往 GitHub 下载。</p>
-        <button id="releasePage" class="text-button">查看 GitHub 发布页 ↗</button>
-      </section>
-      <section class="client-setting" aria-labelledby="clientSettingTitle">
-        <div class="setting-row"><strong id="clientSettingTitle">网易云音乐路径</strong><button id="editClientPath" class="outline-button">更改路径</button></div>
-        <p id="clientDirectorySummary" class="client-directory">尚未设置</p>
-        <p class="muted">连接客户端时使用此目录。保存新路径后，下次连接生效。</p>
-      </section>
-      <label class="setting-row"><span>点击歌词后立即播放</span><input id="playOnLyricSeek" type="checkbox" checked /></label>
+<div class="pref-layout"><nav class="pref-nav" aria-label="设置分类"><button data-pref="practice" aria-pressed="true">阅读与播放</button><button data-pref="theme" aria-pressed="false">主题配色</button><button data-pref="desktop" aria-pressed="false">桌面歌词</button><button data-pref="system" aria-pressed="false">启动与备份</button><button data-pref="client" aria-pressed="false">连接与更新</button></nav><div class="pref-body"><section id="pref-practice"><h3>阅读与播放</h3><label class="setting-row"><span>点击歌词后立即播放</span><input id="playOnLyricSeek" type="checkbox" checked /></label>
       <label class="setting-row"><span>浏览其他歌词后，4 秒自动回到当前句</span><input id="resumeAfterBrowse" type="checkbox" /></label>
-      <p class="muted">关闭自动返回时，手动浏览会一直停留；点击「回到当前歌词」恢复跟随。设置自动保存，重启后保持。</p>
-      <div class="tool-grid">
-        <button id="importLyrics">
-          <svg><use href="#i-folder" /></svg><strong>导入原文歌词</strong
-          ><span>LRC / YRC / TXT</span></button
-        ><button id="importTranslation">
-          <svg><use href="#i-book" /></svg><strong>导入中文译文</strong
-          ><span>按歌词时间自动对齐</span></button
-        ><button id="translate">
-          <span class="tool-glyph">译</span><strong>补充中文机译</strong
-          ><span>联网补全缺失译文：Google / MyMemory</span>
-        </button>
-      </div>
+      <p class="muted">手动浏览后，点「回到当前歌词」可立即恢复跟随。</p>
       <label class="setting-row lyric-font-setting" for="lyricFont"><span>歌词文本字体</span><select id="lyricFont" aria-describedby="lyricFontHint"><option value="">默认 · 统一黑体</option></select></label>
       <p id="lyricFontHint" class="muted">使用本机已安装的字体；原文即时预览，注音保持清晰易读的字体。</p>
       <p id="lyricFontPreview" class="lyric-font-preview" aria-label="歌词字体预览">作词・作詞　黄家驹・黃家駒<br />君と歌う　You belong to me</p>
@@ -413,7 +370,46 @@
         按住 Shift 再按 ← / →，以 10 毫秒微调。普通 LRC
         的行内着色按时间估算；YRC 使用原始逐字时间。
       </p>
+</section><section id="pref-theme" hidden><h3>主题配色</h3>
+        <div class="theme-preview"><div id="themeSample"></div><strong><em>朝の</em>光を追いかけて</strong><span>追逐清晨的阳光</span></div>
+        <label class="setting-row">色板<select id="themePreset"><option value="studio">紫灰</option><option value="tide">海雾</option><option value="amber">琥珀</option><option value="custom">自定义</option></select></label>
+        <div class="setting-row">外观<div class="segmented"><button data-scheme-choice="light">亮色</button><button data-scheme-choice="dark">深色</button></div></div>
+        <div class="theme-pickers"><label><input type="color" id="theme-bg">背景</label><label><input type="color" id="theme-text">文字</label><label><input type="color" id="theme-accent">已唱与强调色</label></div>
+        <p id="themeContrast" role="status"></p><p class="muted">在预设上调色会用这套配色替换「自定义」。亮色和深色分别保存。</p><button id="themeReset" class="text-button">将当前外观恢复为紫灰</button>
+      </section><section id="pref-desktop" hidden><h3>桌面歌词</h3><div id="deskPreview" aria-label="桌面歌词配色预览"><div id="deskSwatch"><small id="previewNote" hidden></small><strong id="previewInk"><b><ruby>朝<rt>あさ</rt></ruby>の</b><ruby>光<rt>ひかり</rt></ruby></strong><span id="previewTrans">清晨的光</span></div></div><div class="pref-checks"><label><input type="checkbox" data-desk="enabled"> 显示浮窗</label><label><input type="checkbox" data-desk="topmost" checked> 窗口置顶</label><label><input type="checkbox" data-desk="pinned"> 钉住并穿透鼠标</label></div>
+        <div class="pref-checks"><label><input type="checkbox" data-desk="original"> 原文</label><label><input type="checkbox" data-desk="reading"> 注音</label><label><input type="checkbox" data-desk="translation"> 翻译</label><label><input type="checkbox" data-desk="roman"> 日语罗马音</label></div>
+        <label class="shadow-choice"><input type="checkbox" data-desk="shadow"> 歌词底部阴影</label><div class="color-picks"><label><input type="color" data-desk="highlight">已唱</label><label><input type="color" data-desk="ink">原文</label><label><input type="color" data-desk="note">注音</label><label><input type="color" data-desk="trans">译文</label><label><input type="color" data-desk="paper">底色</label></div>
+        <label class="setting-row">浮窗字号<input data-desk="size" type="range" min="18" max="56"><output id="deskSize"></output></label>
+        <label class="setting-row">背景不透明度<input type="range" data-desk="opacity" min="0" max="100"><output id="deskOpacity"></output></label><p class="muted">悬停显示工具，滚轮调字号，拖右边缘调宽。钉住后，在歌词上停留三秒，点击小锁解锁。</p>
+      </section><section id="pref-system" hidden><h3>启动与备份</h3><label class="setting-row">关闭主窗口时最小化到托盘<input data-desk="tray" type="checkbox" checked></label>
+        <label class="setting-row">开机自启动<input data-desk="startup" type="checkbox"></label>
+        <div class="practice-actions"><button id="backupExport">导出备份…</button><button id="backupImport">恢复备份…</button></div><p id="backupFeedback" role="status" class="muted"></p>
+      </section><section id="pref-client" hidden><h3>连接与更新</h3><section class="app-update" aria-labelledby="updateSettingTitle">
+        <div class="setting-row"><strong id="updateSettingTitle">应用更新 <span id="appVersion" class="muted"></span></strong><button id="checkUpdate" class="outline-button">检查更新</button></div>
+        <p id="updateFeedback" class="muted" role="status" aria-live="polite">每次启动自动检查正式版本，有更新时提示前往 GitHub 下载。</p>
+        <button id="releasePage" class="text-button">查看 GitHub 发布页 ↗</button>
+      </section>
+      <section class="client-setting" aria-labelledby="clientSettingTitle">
+        <div class="setting-row"><strong id="clientSettingTitle">网易云音乐路径</strong><button id="editClientPath" class="outline-button">更改路径</button></div>
+        <p id="clientDirectorySummary" class="client-directory">尚未设置</p>
+        <p class="muted">连接客户端时使用此目录。保存新路径后，下次连接生效。</p>
+      </section>
+      <footer class="credits"><button id="author" class="author">
+          由 @朝禊ASOGI 制作 <span>↗</span></button
+        ><button id="github" class="author" title="在系统浏览器打开项目源码与反馈页">GitHub 项目 <span>↗</span></button>
+        <span id="sidebarVersion" class="version">咏伴</span>
+      </footer></section></div></div>
     </dialog>
+    <dialog id="pasteDialog" aria-labelledby="pasteTitle"><form id="pasteForm"><div class="modal-title"><h2 id="pasteTitle">粘贴歌词</h2><button type="button" class="close-dialog icon-button" aria-label="关闭">×</button></div><label for="pasteText">每行一句；已有假名可写成 光（ひかり）。</label><textarea id="pasteText" rows="9" required placeholder="朝の光（ひかり）を追いかけて"></textarea><p class="muted">保留 LRC 时间标签即可跟随播放。纯文本可逐行阅读。</p><p id="pasteError" role="alert"></p><button class="primary-button">导入并注音</button></form></dialog>
+    <dialog id="segmentDialog" aria-labelledby="segmentTitle"><form id="segmentForm">
+      <div class="modal-title"><h2 id="segmentTitle">编辑练唱句</h2><button type="button" class="close-dialog icon-button" aria-label="关闭">×</button></div>
+      <label>歌词行<select id="segmentLine"></select></label>
+      <label>练唱原文<input id="segmentOriginal" maxlength="2000" required></label>
+      <label>假名 / 注音<input id="segmentKana" maxlength="2000"></label>
+      <label>音译 / 罗马音<input id="segmentRoman" maxlength="2000"></label>
+      <div class="cut-tools"><button type="button" id="insertCut">＋ 插入分隔线</button><span>先点选文字中的位置，再分段。</span></div>
+      <p id="segmentError" role="alert"></p><div class="dialog-actions"><button type="button" id="resetSentence">恢复原句</button><button class="primary-button">保存本句</button></div>
+    </form></dialog>
     <dialog id="updateDialog" aria-labelledby="updateTitle" aria-describedby="updateDescription">
       <div class="modal-title"><h2 id="updateTitle">发现新版本</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
       <p id="updateDescription"></p>
@@ -430,7 +426,7 @@
           <button id="browseClientPath" type="button" class="outline-button">浏览…</button>
         </div>
         <p id="clientPathError" class="client-path-error" role="alert" hidden></p>
-        <p class="muted">可随时在「设置 → 网易云音乐路径」修改。暂时跳过也能使用本地练唱。</p>
+        <p class="muted">可随时在「设置 → 连接与更新 → 网易云音乐路径」修改。暂时跳过也能使用本地练唱。</p>
         <div class="dialog-actions"><button id="cancelClientPath" type="button">暂时跳过</button><button id="saveClientPath" type="submit" class="primary-button">保存路径</button></div>
       </form>
     </dialog>
@@ -468,9 +464,17 @@
         <button id="saveReading" class="primary-button" type="submit">保存注音</button>
       </form>
     </dialog>
+    <dialog id="supportDialog" aria-labelledby="supportTitle" aria-describedby="supportHint">
+      <div class="modal-title">
+        <h2 id="supportTitle">赞赏作者</h2>
+        <button type="button" class="close-dialog icon-button" aria-label="关闭赞赏窗口" autofocus>×</button>
+      </div>
+      <div class="support-code"><img src="../assets/wechat-appreciation.png" alt="Cerulean 的微信赞赏码" loading="lazy" /></div>
+      <p id="supportHint"><strong>Cerulean</strong>用微信「扫一扫」赞赏作者</p>
+    </dialog>
     <dialog id="helpDialog" aria-labelledby="helpTitle">
       <div class="modal-title">
-        <h2 id="helpTitle">每次，练好一句。</h2>
+        <h2 id="helpTitle">使用指南与快捷键</h2>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
       <div class="help-copy">
@@ -483,9 +487,10 @@
           打开音频后，自动加载同名 .lrc / .yrc 和 .zh.lrc
           译文。也可通过歌词工具手动导入。原文、注音和译文可以同时显示。
         </p>
+        <h3>编辑一句或放到桌面</h3><p>将指针移到要练的歌词行，点「分段」。在已有文字里插入 /，或直接改字。播放器上的「桌面歌词」可以显示或隐藏浮窗；勾选旁边的「钉住」让鼠标穿透。悬停歌词三秒后点小锁即可解锁，再用滚轮调字号或右键改样式。</p>
         <h3>精细定位</h3>
         <p>
-          点击歌词默认跳到句首并播放，可在「设置」关闭自动播放。手动浏览默认持续停留，点击「回到当前歌词」恢复跟随；设置中可开启 4 秒自动返回。顶部各组选项可折叠并自动记忆。按 L 开启单句循环。按 [ 设置 A 点，按 ] 设置 B 点。←
+          点击歌词默认跳到句首并播放，可在「设置」关闭自动播放。手动浏览默认持续停留，点击「回到当前歌词」恢复跟随；设置中可开启 4 秒自动返回。注音、译文、罗马音、粤拼与词典在「练唱谱」旁直接切换；来源和时间轴说明见左栏「播放信息」。按 L 开启单句循环。按 [ 设置 A 点，按 ] 设置 B 点。←
           / → 调整 0.1 秒，Shift + ← / → 调整 0.01 秒，↑ / ↓ 切换歌词行。
         </p>
         <h3>读懂歌词</h3>
@@ -499,14 +504,14 @@
         <h3>网络与退出</h3>
         <p>
           歌词来自网易云，中文词义来自有道；点击“补充中文机译”才会把缺少译文的歌词发送给
-          Google 翻译；不可用时使用 MyMemory。启动及手动检查更新会访问 GitHub 正式发布接口。关闭本窗口或日志窗口即可退出工具。
+          Google 翻译；不可用时使用 MyMemory。启动及手动检查更新会访问 GitHub 正式发布接口。关闭主窗口默认收进托盘；右键托盘图标，选择「退出咏伴」即可退出。
         </p>
       </div>
     </dialog>
     <!-- 曲库保持单一列表与来源筛选，歌词搜索继续只替换歌词，避免两个操作混淆。 -->
     <dialog id="libraryDialog" aria-labelledby="libraryTitle">
       <div class="library-header">
-        <div><span class="eyebrow">YOUR PRACTICE COLLECTION</span><h2 id="libraryTitle">最近播放</h2></div>
+        <div><h2 id="libraryTitle">最近播放</h2></div>
         <button class="close-dialog icon-button" aria-label="关闭曲库">×</button>
       </div>
       <div class="library-tabs" role="tablist" aria-label="曲库视图">
@@ -533,14 +538,16 @@
               <button data-source="all" aria-pressed="true">全部</button><button data-source="local" aria-pressed="false">本地</button><button data-source="cloud" aria-pressed="false">网易云</button>
             </div>
             <span id="librarySummary" class="muted" role="status"></span>
-            <div class="player-spacer"></div>
+            </div>
+          <div class="deck-tools">
             <button id="renamePlaylist" class="text-button" hidden>重命名</button>
             <button id="deletePlaylist" class="text-button danger-text" hidden>删除歌单</button>
             <button id="clearHistory" class="text-button" title="只清除所选来源的历史，不影响收藏">清空记录</button>
           </div>
           <p id="libraryFeedback" class="library-feedback" role="status" aria-live="polite" hidden></p>
           <div id="libraryTracks" class="library-tracks" aria-label="曲目"></div>
-          <div class="library-pagination"><span id="libraryPageLabel" class="muted"></span><div class="player-spacer"></div><button id="libraryPrev" class="outline-button">上一页</button><button id="libraryNext" class="outline-button">下一页</button></div>
+          <div class="library-pagination"><span id="libraryPageLabel" class="muted"></span></div>
+          <div class="deck-tools"><button id="libraryPrev" class="outline-button">上一页</button><button id="libraryNext" class="outline-button">下一页</button></div>
         </section>
       </div>
     </dialog>

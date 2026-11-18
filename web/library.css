@@ -86,7 +86,7 @@ dialog label { font-size: 13px; }
 .library-tabs button[aria-selected="true"] { color: var(--green); border-color: var(--green); font-weight: 600; }
 .library-body { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; min-height: 0; }
 .library-body.has-playlists { grid-template-columns: 176px minmax(0, 1fr); }
-.playlist-sidebar { display: flex; flex-direction: column; padding: 16px 10px; background: #f1f3f7; border-right: 1px solid var(--line); overflow-y: auto; scrollbar-width: thin; }
+.playlist-sidebar { display: flex; flex-direction: column; padding: 16px 10px; background: #f1f3f7; border-right: 1px solid var(--line); overflow-y: auto; }
 .playlist-item { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 13px; margin-bottom: 3px; }
 .playlist-item.selected { color: #274c9d; background: #e1e8f9; font-weight: 600; }
 .playlist-item svg { width: 17px; height: 17px; }
@@ -107,7 +107,7 @@ dialog label { font-size: 13px; }
 .segmented button { border-radius: 4px; padding: 5px 11px; font-size: 12px; color: #5d6b80; }
 .segmented button[aria-pressed="true"] { background: var(--green); color: #fff; }
 .library-feedback { padding: 9px 12px; margin: 0 0 8px; font-size: 12px; color: #2b4c8d; background: #edf2fc; border-radius: 6px; line-height: 1.6; }
-.library-tracks { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.library-tracks { flex: 1; min-height: 0; overflow-y: auto; }
 .library-track { display: flex; gap: 10px; align-items: center; border-top: 1px solid #edf0f5; padding: 7px 4px; min-height: 70px; }
 .library-track.current-track { background: #f0f4ff; border-radius: 7px; box-shadow: inset 3px 0 var(--green); }
 .track-play { flex: 1; min-width: 0; text-align: left; display: flex; gap: 12px; align-items: center; border-radius: 5px; padding: 6px; }

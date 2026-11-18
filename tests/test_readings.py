@@ -21,6 +21,14 @@ class ReadingTests(unittest.TestCase):
     def line(self, text, reading, start=1000):
         return {"start": start, "text": text, "pronunciation": reading}
 
+    def test_plain_author_reading_crosses_dictionary_boundary(self):
+        lines = self.annotator.enrich(parse_lyrics("未来世界（あした）\n君と歩く"))
+        self.assertEqual(lines[0]["text"], "未来世界")
+        self.assertNotIn("cantoneseTokens", lines[0])
+        self.assertEqual(lines[0]["tokens"][0]["reading"], "あした")
+        self.assertEqual(lines[0]["tokens"][0]["romaji"], "ashita")
+        self.assertIsNone(lines[0]["start"])
+
     def test_syllable_boundaries_gemination_and_macrons(self):
         self.assertEqual(reading_kana("shi n a i n'ya kitto shōnen"), "しんあいんやきっとしょうねん")
         self.assertEqual(reading_kana("ヒカリ"), "ひかり")

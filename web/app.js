@@ -39,6 +39,9 @@ window.__errors = [];
 window.addEventListener("error", (e) => window.__errors.push(e.message));
 let toastTimer,
   lastRenderActive = -2;
+const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)");
+let frameTicket=0, wakeTimer=0, refreshHz=60, nextPaint=0, unlockedFrames=false;
+let controlSignature="";
 let lyricRows = [], activeTokens = [], previousFrame = 0;
 let modalOpen = false, lastPlayback = {}, lastCloud = null;
 const setText = (element, value) => { if (element.textContent !== String(value)) element.textContent = value; };
@@ -133,10 +136,13 @@ function updatePlayback(data) {
     sampled: performance.now(),
   });
   // 弹窗不需要重绘背后的毫秒计时、按钮与进度条；真实播放状态继续接收。
-  if (!modalOpen) renderPlaybackControls();
+  if (!modalOpen) {renderPlaybackControls();scheduleFrame();}
 }
 function renderPlaybackControls() {
   const data = lastPlayback;
+  const signature=[state.playing,state.duration,state.canSeek,state.canRate,state.rate,data.canPlay].join("|");
+  if(signature===controlSignature)return;
+  controlSignature=signature;
   setText($("playGlyph"), state.playing ? "Ⅱ" : "▶");
   $("play").setAttribute("aria-label", state.playing ? "暂停" : "播放");
   $("seek").disabled = !state.canSeek;
@@ -157,11 +163,14 @@ function renderPlaybackControls() {
     $(id).disabled = !state.canSeek;
 }
 function setMode(mode) {
+  if (mode !== state.mode && $("playerVolumePanel").matches(":popover-open")) $("playerVolumePanel").hidePopover();
   state.mode = mode;
+  lastCloud = null;
+  updateConnectLabel();
   $("practiceButton").hidden = mode !== "cloud";
   $("connectCloud").hidden = mode !== "cloud";
-  $("cloudMode").classList.toggle("selected", mode === "cloud");
-  $("localMode").classList.toggle("selected", mode === "local");
+  $("cloudMode").setAttribute("aria-pressed", String(mode === "cloud"));
+  $("localMode").setAttribute("aria-pressed", String(mode === "local"));
   $("capabilityNotice").hidden = true;
   $("connectionLabel").textContent =
     mode === "local" ? "本地练唱 · 毫秒定位" : "正在连接网易云";
@@ -183,7 +192,7 @@ function showWord(token) {
   $("dictReading").textContent =
     (state.romaji && token.language === "ja" ? token.romaji : "") || token.reading || (token.language === "ja" ? token.text : "暂无词典音标");
   $("dictPos").textContent = token.pos || "词汇";
-  $("correctButton").textContent = token.language === "zh" ? "修正这个字的粤拼 ↗" : "修正这个词的注音 ↗";
+  $("correctButton").textContent = token.language === "zh" ? "修正粤拼" : "修正注音";
   $("dictionaryWeb").hidden = token.language === "zh";
   $("dictDefinitions").textContent = "正在查询中文释义…";
   $("dictSource").textContent = token.source;
@@ -197,6 +206,8 @@ function displayTokens(line) {
 }
 function appendLineTokens(original, line) {
   let character = 0;
+  // 后端断点按 Unicode 码点计数，DOM 的文本切片使用 UTF-16。
+  const cuts=(line.breaks||[]).map(i=>Array.from(line.text).slice(0,i).join('').length);
   for (const token of displayTokens(line)) {
     const span = document.createElement("span");
     span.className = "token" + (token.language === "en" ? " en" : token.language === "zh" ? " zh" : "");
@@ -208,12 +219,17 @@ function appendLineTokens(original, line) {
     if (token.reading) span.title = `${token.reading} · ${token.source || "自动注音"}` +
       (token.readingConflict ? "\n读音有分歧，词典模式中可比较并修正：" +
         token.readingCandidates.map(c=>`${c.reading}（${c.source}）`).join(" / ") : "");
+    span.breaks=cuts;
     span.lyricToken = token;
     renderTokenReading(span, token);
     span.addEventListener("click", (e) => {
       const current = span.lyricToken;
       if (state.dict && !e.shiftKey && current.language) {
-        e.stopPropagation(); showWord(current);
+        e.stopPropagation();
+        // 保留查词位置的视觉反馈；只更新两枚词节点，不重排本句、不干扰逐字进度。
+        document.querySelector(".token.looked-up")?.classList.remove("looked-up");
+        span.classList.add("looked-up");
+        showWord(current);
       }
     });
     original.append(span);
@@ -236,6 +252,11 @@ function renderLyrics() {
     appendLineTokens(original, line);
     if (!line.text) original.textContent = "· · ·";
     row.append(original);
+    drawSegments(row,line);
+    const edit=document.createElement("button");
+    edit.type="button";edit.className="edit-line";edit.textContent="分段";edit.setAttribute("aria-label","编辑本句原文与分段");
+    edit.onclick=event=>{event.stopPropagation();action("editSegments",index);};
+    row.append(edit);
     if (line.translation) {
       const translated = document.createElement("div");
       translated.className = "lyric-translation";
@@ -250,11 +271,11 @@ function renderLyrics() {
     }
     const jump = () => {
       if (line.start !== null) seek(line.start + state.offset, true);
-      else toast("纯文本歌词没有时间标签。");
+      else { action("desktopLine",index); toast("已选中这一句 · 纯文本无时间轴"); }
     };
     row.addEventListener("click", jump);
     row.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+      if (e.target===row && e.key === "Enter") {
         e.preventDefault();
         jump();
       }
@@ -307,56 +328,50 @@ function patchReadings(data) {
   $("saveReading").disabled = false; $("saveReading").textContent = "保存注音";
   toast("注音已保存。");
 }
-function rubyParts(token) {
-  if (token.language !== "ja" || !token.reading) return [token];
-  const hira = text => text.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 96));
-  const pieces = token.text.match(/[\u3400-\u9fff々]+|[^\u3400-\u9fff々]+/g) || [];
-  const reading = hira(token.reading), solutions = [];
-  function split(index, cursor, parts) {
-    if (solutions.length > 1) return;
-    if (index === pieces.length) {
-      if (cursor === reading.length) solutions.push(parts);
-      return;
-    }
-    const text = pieces[index];
-    if (!/[\u3400-\u9fff々]/.test(text)) {
-      if (reading.startsWith(hira(text), cursor)) split(index + 1, cursor + text.length, [...parts, {text, reading:""}]);
-      return;
-    }
-    for (let end = cursor + 1; end <= reading.length; end++) {
-      split(index + 1, end, [...parts, {text, reading: reading.slice(cursor, end)}]);
-      if (solutions.length > 1) return;
-    }
-  }
-  split(0, 0, []);
-  // 内部假名也作为锚点：逃(に)げ出(だ)し。熟字训或边界歧义保留整词。
-  return solutions.length === 1 ? solutions[0] : [token];
-}
 function renderTokenReading(span, token) {
   // 罗马音按整个词的最终读音展示：不在假名锚点处拆开促音、拗音等组合。
   // 默认模式仍沿用原有汉字分段 ruby；英语继续展示原来的 IPA。
   const romanized = state.romaji && token.language === "ja" && !!token.romaji;
-  const parts = romanized ? [{text: token.text, reading: token.romaji}] : rubyParts(token);
+  const parts = romanized ? [{text: token.text, reading: token.romaji}] : (token.rubyParts || [token]);
   span.classList.toggle("has-reading", !!token.reading || romanized);
   span.replaceChildren();
   let partStart = Number(span.dataset.start);
   for (const part of parts) {
-    const base = document.createElement("span");
-    base.className = "token-base";
-    base.dataset.start = partStart;
+    const begin = partStart;
     partStart += part.text.length;
-    base.dataset.end = partStart;
-    base.textContent = part.text;
+    const body = part.reading ? document.createElement("ruby") : span;
+    let pos = begin;
+    function appendBase(end) {
+      if (end === pos) return;
+      const base = document.createElement("span");
+      base.className = "token-base";
+      base.dataset.start = pos;
+      base.dataset.end = end;
+      base.textContent = part.text.slice(pos - begin, end - begin);
+      body.append(base);
+      pos = end;
+    }
+    // 每个唱词片段单独着色。斜线和留白没有时间，也不把注音或查词目标切成两个词。
+    for (const cut of span.breaks || []) {
+      if (cut < begin || cut >= partStart) continue;
+      appendBase(cut);
+      const mark = document.createElement("i");
+      mark.className = "breath";
+      mark.setAttribute("aria-hidden","true");
+      (cut === begin ? span : body).append(mark);
+    }
+    appendBase(partStart);
     if (part.reading) {
-      const ruby = document.createElement("ruby"), rt = document.createElement("rt");
+      const rt = document.createElement("rt");
       rt.textContent = part.reading;
-      ruby.append(base, rt);
-      span.append(ruby);
-    } else span.append(base);
+      body.append(rt);
+      span.append(body);
+    }
   }
 }
 function changeRomaji() {
   state.romaji = $("romajiToggle").checked;
+  lyricRows.forEach((row,i)=>drawSegments(row,state.lines[i]));
   // 不调用 renderLyrics，保留当前焦点、手动浏览暂停、循环和歌词行对象。
   document.querySelectorAll(".lyric-original .token").forEach(span => {
     if (span.lyricToken.language === "ja") renderTokenReading(span, span.lyricToken);
@@ -369,17 +384,22 @@ function changeRomaji() {
   followCurrent();
   savePreferences();
 }
+const wordBoundaries=new WeakMap();
 function updateHighlight(position) {
   const lyricPosition = position - state.offset,
     index = currentIndex(lyricPosition);
   state.active = index;
   if (index !== lastRenderActive) {
     // 只有换行时更新行状态；每帧只更新当前行的字词，长歌词不会逐帧遍历 DOM。
-    lyricRows.forEach((r, i) => {
-      r.classList.toggle("past", index >= 0 && i < index);
-      r.classList.toggle("active", i === index);
-      if (i !== index) r.removeAttribute("aria-current");
-    });
+    // 正常逐句播放只更新上一句和当前句；跳转才触及跨过的行。
+    const first=lastRenderActive < -1 ? 0 : Math.max(0,Math.min(index,lastRenderActive));
+    const stop=lastRenderActive < -1 ? lyricRows.length : Math.max(index,lastRenderActive)+1;
+    for(let i=first;i<stop;i++){
+      const r=lyricRows[i];
+      r.classList.toggle("past", index>=0 && i<index);
+      r.classList.toggle("active",i===index);
+      if(i!==index)r.removeAttribute("aria-current");
+    }
     const row = lyricRows[index];
     row?.classList.add("active");
     row?.setAttribute("aria-current", "true");
@@ -394,30 +414,39 @@ function updateHighlight(position) {
     end = lineEnd(index);
   const clamp = value => Math.max(0, Math.min(1, value));
   const characters = end > line.start ? clamp((lyricPosition - line.start) / (end - line.start)) * line.text.length : 0;
-  let wordCursor = 0;
-  const timedWords = line.timing === "word" ? line.words.map(word => {
-    const start = wordCursor;
-    wordCursor += word.text.length;
-    return {start, end: wordCursor, progress: clamp((lyricPosition - word.start) / Math.max(1, (word.end ?? end) - word.start))};
-  }) : [];
-  for (const token of activeTokens) {
-    const start = Number(token.dataset.start),
-      end = Number(token.dataset.end);
-    // 按原始字词范围着色，重叠时间或停顿不会把下一词的进度挤到前一词。
-    const passed = timedWords.length ? timedWords.reduce((sum, word) => {
-      const sungEnd = word.start + (word.end - word.start) * word.progress;
-      return sum + Math.max(0, Math.min(end, word.end, sungEnd) - Math.max(start, word.start));
-    }, 0) : characters - start;
-    token.style.setProperty(
-      "--fill",
-      `${clamp(passed / Math.max(1, end - start)) * 100}%`,
-    );
+  // 时间段的原文边界只解析一次。双游标只访问与当前字组相交的词；
+  // 词间停顿和时间重叠按各自原始时间计算，不用全句平均速度取代。
+  let intervals=[];
+  if(line.timing==="word" && line.words){
+    if(!wordBoundaries.has(line.words)){
+      let offset=0;
+      wordBoundaries.set(line.words,line.words.map(w=>{
+        const start=offset; offset+=w.text.length;
+        return {start,stop:offset,word:w};
+      }));
+    }
+    intervals=wordBoundaries.get(line.words);
+  }
+  let j=0;
+  for(const token of activeTokens){
+    const start=Number(token.dataset.start),stop=Number(token.dataset.end);
+    let passed=characters-start;
+    if(intervals.length){
+      while(j<intervals.length && intervals[j].stop<=start)++j;
+      passed=0;
+      for(let k=j;k<intervals.length && intervals[k].start<stop;k++){
+        const w=intervals[k], frac=clamp((lyricPosition-w.word.start)/Math.max(1,(w.word.end??end)-w.word.start));
+        passed+=Math.max(0,Math.min(stop,w.start+(w.stop-w.start)*frac)-Math.max(start,w.start));
+      }
+    }
+    const value=clamp(passed/Math.max(1,stop-start))*100;
+    if(value!==token.lastFill){token.lastFill=value;token.style.setProperty("--fill",value+"%");}
   }
 }
 // 居中模式给首尾留半屏空白；坐标以 viewport 为基准，避免 offsetParent 不同造成偏移。
 function followCurrent() {
   if (modalOpen) return;
-  if (!state.follow || state.resumeFollowAt > performance.now()) return;
+  if (!state.follow || pointerOnScrollbar || state.resumeFollowAt > performance.now()) return;
   const row = lyricRows[state.active], viewport = $("lyricViewport");
   if (!row) return;
   const rect = row.getBoundingClientRect(), outer = viewport.getBoundingClientRect();
@@ -425,28 +454,50 @@ function followCurrent() {
   if (state.followMode === "center") target += rect.top - outer.top - (viewport.clientHeight - rect.height) / 2;
   else if (rect.bottom > outer.bottom - 35 || rect.top < outer.top) target += rect.top - outer.top - 35;
   state.scrollTarget = Math.max(0, Math.min(viewport.scrollHeight - viewport.clientHeight, target));
+  scheduleFrame();
 }
+// 同一显示帧只排队一次；原生滚轮、播放快照和交互都可以直接唤醒，无需等暂停轮询。
+function scheduleFrame(){
+  if(frameTicket || modalOpen || document.hidden) return;
+  const request=()=>{frameTicket=requestAnimationFrame(frame);};
+  const ahead=nextPaint-performance.now();
+  // 解限模式下，Chromium 在没有新画面时会将下一次 rAF 延至空闲帧。
+  // 连续动画按屏幕截止时刻直接提交一帧，避免“先等定时器、再等空闲 rAF”双重节流。
+  // 标准模式保持原生 rAF；停止动画或页面隐藏时都不保留持续定时器。
+  if(unlockedFrames && ahead>1 && (state.playing || state.scrollTarget!==null))
+    frameTicket=-setTimeout(()=>frame(performance.now()),ahead);
+  else request();
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)scheduleFrame();});
 function frame(now) {
+  frameTicket=0;
+  // 部分 Qt 后端在持续绘制时给出远多于屏幕刷新率的 rAF。按实际屏幕限绘，
+  // 用绝对截止时刻保留小数毫秒，不把 144 Hz 拆成一连串固定 16 ms 的步长。
+  now=performance.now();
+  if(now+.6<nextPaint){scheduleFrame();return;}
+  const period=1000/refreshHz;
+  nextPaint=(now-nextPaint>period ? now : nextPaint)+period;
   const elapsed = Math.min(50, now - (previousFrame || now));
   previousFrame = now;
   if (modalOpen || document.hidden) {
     // 降低合成唤醒，避免部分显卡上弹窗与歌词渐变反复争用重绘层。
-    setTimeout(() => requestAnimationFrame(frame), 100);
+
     return;
   }
-  if (state.follow && state.resumeFollowAt && now >= state.resumeFollowAt) {
+  if (state.follow && !pointerOnScrollbar && state.resumeFollowAt && now >= state.resumeFollowAt) {
     state.resumeFollowAt = 0;
     $("followButton").hidden = true;
     followCurrent();
   }
-  if (state.scrollTarget !== null) {
-    const viewport = $("lyricViewport"), delta = state.scrollTarget - viewport.scrollTop;
+  const target = state.scrollTarget;
+  if (target !== null) {
+    const viewport = $("lyricViewport"), delta = target - viewport.scrollTop;
     // 根据经过的毫秒计算动画速度，170 Hz 与 60 Hz 上拥有相同的过渡时长。
     // Chromium 将 scrollTop 量化为设备像素；末段至少移动一像素，避免渐近插值卡住。
     const pixel = 1 / devicePixelRatio;
     const step = Math.sign(delta) * Math.min(Math.abs(delta), Math.max(pixel, Math.abs(delta) * (1 - Math.exp(-elapsed / 65))));
-    viewport.scrollTop += matchMedia("(prefers-reduced-motion: reduce)").matches ? delta : step;
-    if (Math.abs(delta) <= pixel) { viewport.scrollTop = state.scrollTarget; state.scrollTarget = null; }
+    viewport.scrollTop += reducedMotion.matches ? delta : step;
+    if (Math.abs(delta) <= pixel || reducedMotion.matches) { viewport.scrollTop = target; state.scrollTarget = null; }
   }
   const position = state.dragging
     ? Number($("seek").value)
@@ -459,8 +510,7 @@ function frame(now) {
   );
   if (state.hasTimeline) updateHighlight(position);
   // 暂停且无滚动动画时降低唤醒频率；播放期间完整使用引擎的 rAF 节拍。
-  if (state.playing || state.dragging || state.scrollTarget !== null) requestAnimationFrame(frame);
-  else setTimeout(() => requestAnimationFrame(frame), 80);
+  if (state.playing || state.dragging || state.scrollTarget !== null) scheduleFrame();
 }
 function loopLine() {
   if (state.loop) {
@@ -521,13 +571,29 @@ new MutationObserver(() => {
   if (open === modalOpen) return;
   modalOpen = open;
   if (!open) {
-    renderPlaybackControls();
+    scheduleFrame();renderPlaybackControls();
     if (lastCloud && state.mode === "cloud") renderCloudStatus(lastCloud);
     updateHighlight(estimatedPosition()); followCurrent();
   }
 }).observe(document.body, {subtree: true, attributes: true, attributeFilter: ["open"]});
 function onEvent(kind, data) {
-  if (kind === "lyricFonts") setLyricFonts(data.families || []);
+  if (typeof practiceEvent === "function" && practiceEvent(kind,data)) return;
+  if (kind === "playerVolume") {
+    if(data.mode!==state.mode || data.request!==mixerRequest) return;
+    const ready=Number.isInteger(data.percent);
+    $("mixerSlider").disabled=!ready;
+    $("mixerLevel").textContent=ready?data.percent+"%":"—";
+    if(ready){
+      $("mixerSlider").value=data.percent;
+      $("mixerSlider").style.setProperty("--progress",data.percent+"%");
+      if(data.mode==="local"){
+        $("volume").value=data.percent;
+        $("volumeLabel").textContent=data.percent+"%";
+      }
+    }
+    mixerTarget=data.target||null;
+    $("mixerHint").textContent=data.message||(state.mode==="local"?"本地播放器":"Windows 混音器 · 仅网易云音乐");
+  } else if (kind === "lyricFonts") setLyricFonts(data.families || []);
   else if (kind.startsWith("library") || kind === "playlistCreated") {
     if (typeof libraryEvents === "function") libraryEvents(kind, data);
   } else if (kind === "readingCorrected") patchReadings(data);
@@ -537,7 +603,7 @@ function onEvent(kind, data) {
   } else if (kind === "mode") setMode(data.mode);
   else if (kind === "appVersion") {
     $("appVersion").textContent = `v${data.version}`;
-    $("sidebarVersion").textContent = `咏伴 ${data.version} · 让语言在歌声里熟悉`;
+    $("sidebarVersion").textContent = `咏伴 ${data.version}`;
   } else if (kind === "updateStatus") {
     $("checkUpdate").disabled = !!data.busy;
     $("checkUpdate").textContent = data.busy ? "检查中…" : "检查更新";
@@ -572,7 +638,8 @@ function onEvent(kind, data) {
     $("clientPathInput").focus();
   } else if (kind === "clientStatus") {
     $("connectCloud").disabled = !!data.busy;
-    $("connectCloud").textContent = data.busy ? "连接中…" : "连接客户端";
+    $("connectCloud").setAttribute("aria-busy", String(!!data.busy));
+    updateConnectLabel();
     for (const id of ["editClientPath", "browseClientPath", "saveClientPath"]) $(id).disabled = !!data.busy;
     if (!data.busy) $("toast").hidden = true;
   } else if (kind === "clientRestartRequired") {
@@ -581,8 +648,10 @@ function onEvent(kind, data) {
     $("toast").hidden = true;
     if (!$("clientRestartDialog").open) $("clientRestartDialog").showModal();
   }
-  else if (kind === "displayInfo") $("displayInfo").textContent =
-    `显示器 ${data.refreshRate} Hz · ${data.unlimited ? "已解除固定帧率上限" : "系统默认刷新"}`;
+  else if (kind === "displayInfo") {
+    refreshHz=data.refreshRate>0?data.refreshRate:60; unlockedFrames=!!data.unlimited; nextPaint=0;
+    $("displayInfo").textContent="当前屏幕 "+refreshHz+" Hz · 动画随屏幕刷新率调度";
+  }
   else if (kind === "track") {
     $("trackTitle").textContent = data.title;
     $("trackArtist").textContent = data.artist;
@@ -617,14 +686,14 @@ function onEvent(kind, data) {
     else if (!data.lines.length) state.lyricSource = "等待加载歌词";
     $("lyricSource").textContent = state.lyricSource;
     const timed = data.lines.some((l) => l.timing === "word");
-    $("timingHint").textContent = timed
+    $("timingHint").textContent = !data.lines.length ? "等待时间轴" : timed
       ? "原始逐字时间 · 精细跟唱"
       : data.lines.some((l) => l.timing === "none")
         ? "无时间标签 · 自由阅读"
         : "逐行时间 · 行内着色为估算";
     const songReadings = data.lines.filter(l => l.readingSource === "song").length;
     if (data.lines.length) $("timingHint").textContent += songReadings
-      ? ` · ${songReadings} 句参考歌曲读音` : " · 注音为词典推测";
+      ? ` · ${songReadings} 句参考歌曲读音` : data.lines.some(l=>l.inlineReadings?.length) ? " · 含原文指定注音" : " · 注音为词典推测";
     const conflicts = data.lines.flatMap(l=>l.tokens || []).filter(t=>t.readingConflict).length;
     if (conflicts) $("lyricSource").textContent += ` · ${conflicts} 处读音有分歧（虚线标记）`;
     if (data.timingIssues?.length) $("lyricSource").textContent += ` · ${data.timingIssues.length} 处时间戳疑似异常，可切换时间轴`;
@@ -635,16 +704,19 @@ function onEvent(kind, data) {
     if (state.mode !== "cloud") return;
     lastCloud = data;
     if (data.connected) updatePlayback(data);
-    else updatePlayback({playing: false, position: 0, duration: 0, hasTimeline: false});
+    else updatePlayback({playing: false, canPlay:false, position: 0, duration: 0, hasTimeline: false});
     if (!modalOpen) renderCloudStatus(data);
   } else if (kind === "loop") {
     state.loop = data.enabled ? data.region || state.loop : null;
     $("lineLoop").setAttribute("aria-pressed", String(data.enabled));
+    $("clearLoop").disabled = !data.enabled;
+    $("loopHint").hidden = !data.enabled;
     $("loopHint").textContent = data.enabled
-      ? `循环 ${time(state.loop[0])} — ${time(state.loop[1])} · 点击“一句循环”退出`
-      : "空格 播放 / 暂停 · ← → 微调 · 点击歌词跳转";
+      ? `循环 ${time(state.loop[0])} — ${time(state.loop[1])}`
+      : "";
     if (!data.enabled) {
       state.a = null;
+      $("setA").title="设置循环起点（[）"; $("setB").title="设置终点并循环所选区间（]）";
       $("setA").classList.remove("marked");
       $("setB").classList.remove("marked");
     }
@@ -680,35 +752,47 @@ function onEvent(kind, data) {
     toast(data.message, true);
   }
 }
+// 区分「正在连接」「可以连接」「已连接」；忙状态来自操作回执，不能被随后到达的播放快照覆盖。
+function updateConnectLabel() {
+  const direct = state.mode === "cloud" && lastCloud?.connected && lastCloud.transport === "client";
+  setText($("connectLabel"), $("connectCloud").disabled ? "连接中…" : direct ? "查看连接" : "连接客户端");
+}
 function renderCloudStatus(data) {
+    updateConnectLabel();
     $("connection").classList.toggle("online", data.connected);
     setText($("connectionLabel"), data.connected
       ? (data.transport === "client" ? "客户端直连 · 双向同步" : "Windows 媒体同步")
       : "等待网易云播放");
     if (data.connected) {
       $("capabilityNotice").hidden = !!data.hasTimeline;
-      setText($("capabilityNotice"), "Windows 接口未提供进度。点击左侧“连接客户端”，确认重启网易云后启用双向同步。");
+      setText($("capabilityNotice"), "Windows 接口未提供进度。点击左栏“连接客户端”，确认重启网易云后启用双向同步。");
     } else {
       $("capabilityNotice").hidden = false;
       setText($("capabilityNotice"), data.message || "请先在网易云播放一首歌。");
     }
 }
-// 折叠状态和交互偏好沿用桌面持久 profile；缺少新字段时使用新默认值。
-const foldGroups = [["displayFold", "displayGroup"], ["versionsFold", "versionsGroup"], ["infoFold", "infoGroup"]];
-function setFold(button, group, collapsed) {
-  $(group).hidden = collapsed;
-  $(button).setAttribute("aria-expanded", String(!collapsed));
-  $(button).querySelector("span").textContent = collapsed ? "▸" : "▾";
+// 只读取旧配置中仍有意义的版本栏字段。旧版曾折叠「显示」，升级后也要看得到注音与词典。
+function setVersionsCollapsed(collapsed) {
+  $("versionsGroup").hidden = collapsed;
+  $("versionsFold").setAttribute("aria-expanded", String(!collapsed));
 }
-for (const [button, group] of foldGroups) $(button).onclick = () => {
-  setFold(button, group, !$(group).hidden);
+$("versionsFold").onclick = () => {
+  setVersionsCollapsed(!$("versionsGroup").hidden);
   savePreferences();
 };
+// 空格是全局播放键；五个勾选项另外支持 Tab 聚焦、Enter 开关，不与播放快捷键冲突。
+document.querySelector(".display-switches").addEventListener("keydown", e => {
+  if (e.target.matches("input") && e.key === "Enter" && !e.repeat) {
+    e.preventDefault();
+    e.target.click();
+  }
+});
 function savePreferences() {
   try {
     localStorage.setItem(
       "utatomo-display",
       JSON.stringify({
+        theme: Theme.snapshot(),
         ruby: $("rubyToggle").checked,
         translation: $("translationToggle").checked,
         dict: state.dict,
@@ -720,7 +804,7 @@ function savePreferences() {
         followMode: state.followMode,
         playOnLyricSeek: state.playOnLyricSeek,
         resumeAfterBrowse: state.resumeAfterBrowse,
-        collapsed: Object.fromEntries(foldGroups.map(([button, group]) => [group, $(group).hidden])),
+        collapsed: {versionsGroup: $("versionsGroup").hidden},
       }),
     );
   } catch {}
@@ -775,7 +859,11 @@ $("downloadUpdate").onclick = () => {
   $("updateDialog").close();
   action("openUpdate");
 };
-$("connectCloud").onclick = () => action("connectCloud");
+$("connectCloud").onclick = () => {
+  // 已直连时原操作仅报告状态；直接打开详情，不暗示会重启或重连。
+  if (lastCloud?.connected && lastCloud.transport === "client") $("sessionStatus").showPopover();
+  else action("connectCloud");
+};
 $("play").onclick = () => action("toggle");
 $("previousLine").onclick = () => goLine(-1);
 $("nextLine").onclick = () => goLine(1);
@@ -783,6 +871,9 @@ $("lineLoop").onclick = loopLine;
 $("setA").onclick = () => {
   state.a = Math.round(estimatedPosition());
   $("setA").classList.add("marked");
+  $("setA").title="循环起点："+time(state.a);
+  $("setB").title="在当前位置结束并循环（起点 "+time(state.a)+"）";
+  $("clearLoop").disabled = false;
   toast("循环起点 A：" + time(state.a));
 };
 $("setB").onclick = () => {
@@ -804,7 +895,7 @@ $("nudgeBack").onclick = (e) =>
   seek(estimatedPosition() - (e.shiftKey ? 10 : 100));
 $("nudgeForward").onclick = (e) =>
   seek(estimatedPosition() + (e.shiftKey ? 10 : 100));
-$("seek").addEventListener("input", () => (state.dragging = true));
+$("seek").addEventListener("input", () => {state.dragging=true;scheduleFrame();});
 $("seek").addEventListener("change", () => {
   state.dragging = false;
   seek(Number($("seek").value));
@@ -834,20 +925,46 @@ new ResizeObserver(() => {
 }).observe($("lyricViewport"));
 $("dictionaryToggle").onchange = (e) => setDictionary(e.target.checked);
 $("closeDictionary").onclick = () => setDictionary(false);
-// Infinity 表示用户主动浏览，只有显式返回或跳转才恢复；程序滚动不会触发此入口。
+// 浏览不需要重画播放器。只挂一个闹钟；滚动惯性期间更新截止时间，闹钟到点再核对。
+// 只有真正需要恢复跟随才唤醒动画帧；默认手动返回时连这一个定时器也不需要。
+function wakeFollow() {
+  wakeTimer = 0;
+  if (!state.follow || !state.resumeFollowAt || !Number.isFinite(state.resumeFollowAt)) return;
+  const remaining = state.resumeFollowAt - performance.now();
+  if (remaining > 0) wakeTimer = setTimeout(wakeFollow, Math.ceil(remaining));
+  else scheduleFrame();
+}
 function browseLyrics() {
   if (!state.follow) return;
-  state.resumeFollowAt = state.resumeAfterBrowse ? performance.now() + 4000 : Infinity;
   state.scrollTarget = null;
-  $("followButton").hidden = false;
+  state.resumeFollowAt = state.resumeAfterBrowse && !pointerOnScrollbar ? performance.now() + 4000 : Infinity;
+  if ($("followButton").hidden) $("followButton").hidden = false;
+  if (!wakeTimer && Number.isFinite(state.resumeFollowAt)) wakeFollow();
 }
-$("lyricViewport").addEventListener("wheel", browseLyrics, {passive: true});
-$("lyricViewport").addEventListener("touchmove", browseLyrics, {passive: true});
-$("lyricViewport").addEventListener("pointerdown", e => {
-  // 仅滚动条拖动暂停跟随；普通歌词点击仍执行跳转。
-  if (e.target === $("lyricViewport")) browseLyrics();
+// 手动浏览只通知跟随状态；滚轮的距离、反向、触控板惯性和滑块拖动均由 Chromium 处理。
+const lyricViewport = $("lyricViewport");
+let pointerOnScrollbar=false;
+lyricViewport.addEventListener("wheel", e => {
+  if (!e.ctrlKey && e.deltaY) browseLyrics();
+}, {passive:true});
+lyricViewport.addEventListener("touchmove", browseLyrics, {passive:true});
+lyricViewport.addEventListener("pointerdown", e => {
+  const r = lyricViewport.getBoundingClientRect();
+  if (e.target === lyricViewport && e.clientX >= r.left + lyricViewport.clientWidth) {
+    pointerOnScrollbar=true; browseLyrics();
+  }
 });
-$("lyricViewport").addEventListener("keydown", e => {
+function releaseScrollbar() {
+  if (!pointerOnScrollbar) return;
+  pointerOnScrollbar=false;
+  browseLyrics();
+}
+for (const type of ["pointerup","pointercancel","blur"]) window.addEventListener(type,releaseScrollbar);
+lyricViewport.addEventListener("scroll", () => {
+  // 持续拖动和触控板惯性从最后一次实际位移算起；布局变化本身不算主动浏览。
+  if (state.resumeAfterBrowse && state.resumeFollowAt) browseLyrics();
+}, {passive:true});
+lyricViewport.addEventListener("keydown", e => {
   if (["PageUp", "PageDown", "Home", "End"].includes(e.key)) browseLyrics();
 });
 $("followButton").onclick = () => {
@@ -862,9 +979,9 @@ for (const key of ["playOnLyricSeek", "resumeAfterBrowse"]) $(key).onchange = ()
   savePreferences();
 };
 function showCover(source) {
-  $("albumCover").src = source || "../assets/landscape.svg";
+  $("albumCover").src = source || "../assets/sleeve.svg";
   $("albumCover").alt = source ? "当前歌曲封面" : "日光与山峦的原创默认封面";
-  $("coverCaption").hidden = !!source;
+
 }
 $("albumCover").onerror = () => showCover("");
 $("searchButton").onclick = () => $("searchDialog").showModal();
@@ -896,6 +1013,8 @@ $("cancelClientRestart").onclick = () => {
 };
 $("clientRestartDialog").addEventListener("cancel", () => action("confirmClientRestart", false));
 $("helpButton").onclick = () => $("helpDialog").showModal();
+// 仅打开本地图片：复用原生模态窗口的焦点管理、Esc 关闭及关窗后的歌词同步。
+$("supportButton").onclick = () => $("supportDialog").showModal();
 document
   .querySelectorAll(".close-dialog")
   .forEach((b) => (b.onclick = () => b.closest("dialog").close()));
@@ -923,6 +1042,26 @@ $("offset").onchange = () => {
   );
   action("offset", state.offset);
 };
+// 每次打开先读取真实播放器值；只在松手/键盘提交时写入会话，不在高频拖动中枚举系统设备。
+let mixerRequest=0, mixerTarget=null;
+function placeMixer(){
+  const r=$("volumeButton").getBoundingClientRect(), panel=$("playerVolumePanel");
+  panel.style.left=Math.max(8,Math.min(innerWidth-panel.offsetWidth-8,r.right-panel.offsetWidth))+"px";
+  panel.style.bottom=(innerHeight-r.top+8)+"px";
+}
+$("playerVolumePanel").addEventListener("toggle",e=>{
+  if(e.newState!=="open"){++mixerRequest;return;}
+  placeMixer();mixerTarget=null;
+  $("mixerTitle").textContent=state.mode==="local"?"本地音量":"网易云音量";
+  $("mixerHint").textContent="正在读取音量…";$("mixerSlider").disabled=true;$("mixerLevel").textContent="—";
+  action("playerVolume",{mode:state.mode,request:++mixerRequest});
+});
+window.addEventListener("resize",()=>{if($("playerVolumePanel").matches(":popover-open"))placeMixer();});
+$("mixerSlider").oninput=e=>{
+  $("mixerLevel").textContent=e.target.value+"%";
+  e.target.style.setProperty("--progress",e.target.value+"%");
+};
+$("mixerSlider").onchange=e=>action("playerVolume",{mode:state.mode,request:++mixerRequest,target:mixerTarget,percent:Number(e.target.value)});
 $("volume").oninput = () => {
   $("volumeLabel").textContent = $("volume").value + "%";
   action("volume", Number($("volume").value) / 100);
@@ -970,7 +1109,7 @@ function acceptsPlaybackShortcut(e) {
   const editing = target.isContentEditable || target.closest("[contenteditable]:not([contenteditable='false'])") ||
     target.tagName === "TEXTAREA" ||
     (target.tagName === "INPUT" && !["checkbox", "radio", "range", "button", "submit", "reset"].includes(target.type));
-  return !editing && !e.isComposing && !document.querySelector("dialog[open]");
+  return !target.closest("#playerVolumePanel") && !editing && !e.isComposing && !document.querySelector("dialog[open]");
 }
 document.addEventListener("keydown", (e) => {
   if (!acceptsPlaybackShortcut(e)) return;
@@ -1011,6 +1150,7 @@ document.querySelector(".brand img").ondblclick = () => action("chime");
 
 try {
   const p = JSON.parse(localStorage.getItem("utatomo-display") || "{}");
+  Theme.restore(p.theme);
   if (p.ruby !== undefined) $("rubyToggle").checked = p.ruby;
   // 旧配置缺少此字段时维持默认关闭，先读完全部偏好再持久化。
   state.romaji = p.romaji === true;
@@ -1028,7 +1168,7 @@ try {
     if (typeof p[key] === "boolean") state[key] = p[key];
     $(key).checked = state[key];
   }
-  for (const [button, group] of foldGroups) setFold(button, group, p.collapsed?.[group] === true);
+  setVersionsCollapsed(p.collapsed?.versionsGroup ?? true);
   changeFollow();
   setDictionary(!!p.dict);
   display();
@@ -1044,10 +1184,11 @@ if (typeof qt !== "undefined" && typeof QWebChannel !== "undefined") {
         console.error(error);
       }
     });
+    Theme.syncFrame();
     backend.initialize();
   });
 }
-requestAnimationFrame(frame);
+scheduleFrame();
 
 $("practiceButton").onclick = () => {
   action("practice");

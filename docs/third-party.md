@@ -13,6 +13,7 @@
 | pykakasi | 未登录词常用读音回退 | [miurahr/pykakasi](https://github.com/miurahr/pykakasi)，GPLv3 |
 | cmudict / CMUdict | 英语词典发音 | [cmusphinx/cmudict](https://github.com/cmusphinx/cmudict)，BSD 风格许可 |
 | ToJyutping 3.2.0 | 简繁中文的离线粤拼及词组上下文候选 | [CanCLID/ToJyutping](https://github.com/CanCLID/ToJyutping)，BSD 2-Clause；词典 `trie.txt` 随包分发 |
+| pycaw / comtypes | 读取及调节网易云的 Windows 应用音量会话 | [pycaw](https://github.com/AndreMiras/pycaw)、[comtypes](https://github.com/enthought/comtypes)，MIT |
 | PyWinRT | Windows 系统媒体会话 | [pywinrt](https://github.com/pywinrt/pywinrt)，MIT |
 | Requests | 网络请求 | [psf/requests](https://github.com/psf/requests)，Apache 2.0 |
 | websocket-client | 网易云本机 CDP 通道 | [websocket-client](https://github.com/websocket-client/websocket-client)，Apache 2.0 |

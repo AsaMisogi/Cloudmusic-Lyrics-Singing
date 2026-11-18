@@ -1,0 +1,298 @@
+/* Night Session：工作区由三种明度区分，而不是卡片边框。淡紫只表示播放、选择和焦点。
+   字体优先使用本机字族；主谱面与桌面浮窗共用水平对齐，不影响时间轴。 */
+:root{color-scheme:dark;--paper:#17181d;--sidebar:#111216;--surface:#24252d;--ink:#f0eff4;--muted:#a7a6b2;--line:#35353e;--green:#c1b5ff;--sun:var(--green);--active:#27262e;--hover:#303038;--danger:#ffa598;--quiet:#888893;--panel:#202126;--control:#2c2d34;--fill-track:#43434c}
+::selection{color:white;background:#655a89}body{grid-template-columns:84px minmax(0,1fr);background:var(--paper);color:var(--ink)}
+button,select,input,textarea{accent-color:var(--green)}button:hover{background:var(--hover)}button:active{background:var(--hover)}input:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+button:disabled,select:disabled{opacity:.5}
+/* 固定的曲目信息和控制台独占第二行，侧栏与谱面共享其余高度。
+   用明确的网格区而非 fixed，打开词典或拉长歌曲标题都不会盖住歌词。 */
+body {
+  --rail-width: clamp(150px, 15vw, 206px);
+  grid-template-columns: var(--rail-width) minmax(0,1fr);
+  grid-template-rows: minmax(0,1fr) auto;
+}
+.sidebar {grid-area:1 / 1; padding:24px 13px 12px; gap:0; background:var(--sidebar); border-right:1px solid var(--line)}
+main {grid-area:1 / 2; min-width:0; min-height:0; background:var(--paper)}
+.brand {display:flex; align-items:center; justify-content:flex-start; gap:10px; margin:0 8px 32px}
+.brand img {width:33px; height:33px; filter:grayscale(.8)}
+.brand strong {font:650 21px/1.4 "Microsoft YaHei UI",sans-serif; letter-spacing:.04em}
+.rail-heading {display:block; margin:0 8px 8px; font-size:12px; font-weight:550; letter-spacing:.03em; color:var(--muted)}
+.sidebar .source-tabs {display:flex; gap:2px; margin:0 0 10px; padding:3px; background:var(--paper); border:1px solid var(--line); border-radius:9px}
+.source-tabs button {flex:1; display:flex; align-items:center; justify-content:center; gap:4px; padding:6px 0; font-size:12px; border-radius:6px; color:var(--muted)}
+.source-tabs button[aria-pressed=true] {background:var(--active); color:var(--green); font-weight:650}
+.source-tabs svg {width:15px; height:15px}
+.source-actions {display:grid; gap:6px; margin:0 0 23px; padding-bottom:19px; border-bottom:1px solid var(--line)}
+.source-actions button,.sidebar .nav-item {display:flex; align-items:center; justify-content:flex-start; gap:9px; border-radius:7px; text-align:left; width:100%; min-height:36px; margin:0; padding:7px 10px; font-size:13px; line-height:1.4; white-space:nowrap}
+.source-actions svg,.sidebar .nav-item svg {width:17px; height:17px; flex:none}
+.source-actions button {border:1px solid var(--strong-line); color:var(--ink); background:var(--panel)}
+#connectCloud {color:var(--on-accent); background:var(--green); border-color:transparent; font-weight:650}
+.source-actions button[aria-busy=true] {cursor:progress}
+.sidebar .library-nav {display:grid; gap:2px; padding:0; margin:0; border:0}
+.sidebar .nav-item {color:var(--ink); background:transparent}
+.sidebar .nav-item:hover,.source-tabs button:not([aria-pressed=true]):hover {background:var(--hover)}
+.sidebar .nav-count {display:inline; margin-left:auto; color:var(--muted); font:12px/1.2 "Segoe UI",sans-serif}
+.sidebar .sidebar-bottom {margin-top:auto; padding:12px 0 0; border:0}
+.sidebar .sidebar-bottom .nav-item {color:var(--muted)}
+/* 暖金色呼应赞赏码，主操作仍沿用主题强调色；亮色下改用深琥珀文字。 */
+#supportButton {
+  --support-ink: #f0cb91;
+  margin-top: 6px;
+  color: var(--support-ink);
+  background: color-mix(in srgb, var(--support-ink) 9%, var(--sidebar));
+  border: 1px solid color-mix(in srgb, var(--support-ink) 32%, var(--sidebar));
+}
+:root[data-scheme="light"] #supportButton { --support-ink: #794b14; }
+#supportButton:hover { background: color-mix(in srgb, var(--support-ink) 17%, var(--sidebar)); }
+#supportButton:active { background: color-mix(in srgb, var(--support-ink) 24%, var(--sidebar)); }
+#supportDialog { width: min(336px, 88vw); padding: 20px 24px; }
+#supportDialog .modal-title { margin: 0 0 18px; }
+/* 原海报为 1210 × 1210，码区为 (353, 189) 起的 504 像素正方形。
+   只调整显示取景，不重绘码点；外围白边保持安静区，不随深浅主题变色。 */
+.support-code {
+  position: relative;
+  width: min(252px, 100%);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  overflow: hidden;
+  box-sizing: content-box;
+  border: 8px solid white;
+  border-radius: 10px;
+  background: white;
+}
+.support-code img {
+  position: absolute;
+  width: calc(100% * 1210 / 504);
+  max-width: none;
+  left: 50%;
+  top: -37.5%;
+  transform: translateX(-50%);
+}
+#supportHint { margin: 14px 0 0; text-align: center; font-size: 13px; }
+#supportHint strong { display: block; color: var(--ink); font-size: 16px; }
+#sessionStatus {position:fixed; inset:auto auto 106px calc(var(--rail-width) - 8px); width:304px; margin:0; padding:16px; border:1px solid var(--strong-line); border-radius:12px; background:var(--panel); color:var(--ink); box-shadow:0 10px 36px #0004}
+.status-head {display:flex; align-items:center; justify-content:space-between}
+.status-head h2 {margin:0; font-size:17px}
+#sessionStatus dl {margin:10px 0 0; display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px 12px; line-height:1.6; font-size:13px}
+#sessionStatus dt {color:var(--muted)}
+#sessionStatus dd {padding:0; margin:0; font:inherit; color:var(--ink); overflow-wrap:anywhere}
+#capabilityNotice {margin:14px 0 0; padding-top:10px; border-top:1px solid var(--line); color:var(--warning); font-size:13px; line-height:1.6}
+
+/* 第一排固定给练唱功能：勾选标记、文字和焦点同时表达状态，不用点开菜单来发现它们。
+   标题和五个勾选项是同一组；只在可用宽度不足时让右侧辅助工具另起一行。 */
+.score-bar {display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:10px 16px; padding:15px clamp(14px,2vw,32px); border-bottom:1px solid var(--line); flex:none}
+.score-bar h1 {margin:0; flex:none; color:var(--ink); font:650 20px/1.35 "Microsoft YaHei UI",sans-serif; letter-spacing:-.02em}
+.score-bar .display-switches {display:flex; flex-wrap:nowrap; gap:4px; margin:0}
+.display-switches input {inset:0; cursor:pointer; z-index:1}
+.score-bar .display-switches span {display:flex; align-items:center; gap:5px; min-height:32px; padding:5px 9px; font-size:13px; line-height:1.3; border:1px solid var(--strong-line); border-radius:7px; background:var(--panel); color:var(--ink); white-space:nowrap}
+.score-bar .display-switches span::before {content:""; width:10px; height:10px; border-radius:3px; border:1px solid var(--muted)}
+.score-bar .display-switches input:checked+span {border-color:color-mix(in srgb,var(--green) 48%,var(--paper)); background:var(--active); color:var(--green)}
+.score-bar .display-switches input:checked+span::before {content:"✓"; display:grid; place-content:center; color:var(--on-accent); background:var(--green); border-color:var(--green); font:700 10px/1 sans-serif}
+.score-bar .display-switches svg {width:15px; height:15px}
+.score-tools {display:flex; align-items:center; gap:5px; margin-left:auto}
+.score-tool,.import-trigger {display:inline-flex; align-items:center; justify-content:center; gap:5px; height:32px; padding:0 9px; border:1px solid var(--strong-line); border-radius:7px; background:var(--panel); color:var(--ink); white-space:nowrap; font-size:12px}
+.score-tools svg {width:15px; height:15px}
+.search-tool {width:32px; padding:0}
+.import-trigger {color:var(--green); font-weight:600}
+#versionsFold .disclosure {display:inline-block; font-size:14px; line-height:1}
+#versionsFold[aria-expanded=true] .disclosure {transform:rotate(180deg)}
+#versionsFold[aria-expanded=true] {background:var(--active); color:var(--green)}
+#importPopover{position:fixed;inset:auto;margin:0;width:190px;color:var(--ink);background:var(--control);border:1px solid var(--strong-line);padding:5px;border-radius:10px;box-shadow:0 8px 30px #0004}
+#importPopover .nav-item{color:var(--ink);display:flex;gap:10px;align-items:center;min-height:36px;font-size:13px;padding:8px 10px;margin:0;border-radius:5px}#importPopover .nav-item:hover{background:var(--hover)}
+.sr-only{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;padding:0}
+.toolbar,.reading-toolbar{margin:0 clamp(16px,3.5vw,56px);padding:9px 0;border-color:var(--line);color:var(--muted)}
+.display-switches span,.dictionary-switch,.reading-toolbar label{color:var(--muted)}.display-switches input:checked+span{background:var(--active);color:var(--green)}.switch{background:var(--strong-line)}.dictionary-switch input:checked+.switch{background:var(--green)}
+select,input[type=number],input[type=text],textarea,.search-input,.library-search{color:var(--ink);background:var(--control);border-color:var(--strong-line)}
+.capability-notice{background:var(--active);color:var(--warning);border:0}
+.workspace{min-height:0}.lyrics-viewport{background:transparent;}
+.lyrics{padding:20px clamp(24px,6vw,94px) 80px}
+.lyric-line{position:relative;width:100%;max-width:900px;min-width:0;margin:4px auto;padding:16px 48px;border-radius:8px;box-shadow:none}
+.lyric-line.active,.lyric-line.active:hover,.lyric-line:hover{background:transparent;box-shadow:none}.lyric-line:hover:not(.active){background:var(--surface)}
+.lyric-original,.lyric-translation,.segment-strip{text-align:center;overflow-wrap:anywhere}
+body[data-align=left] :is(.lyric-original,.lyric-translation,.segment-strip){text-align:left}
+body[data-align=right] :is(.lyric-original,.lyric-translation,.segment-strip){text-align:right}
+.lyric-line .lyric-original,.lyric-line.past .lyric-original{color:var(--quiet);font-weight:400;line-height:1.55}
+.lyric-line rt,.lyric-line.past rt{color:var(--muted)}.lyric-line.active rt,.segment-strip{color:var(--green)}
+.lyric-line.active .lyric-original{color:var(--ink);font-weight:400}.active .token-base{background-image:linear-gradient(90deg,var(--green) var(--fill,0%),var(--ink) var(--fill,0%))}
+.lyric-translation,.past .lyric-translation{color:var(--muted)}.active .lyric-translation{color:var(--muted)}
+.breath::before{content:"/";color:var(--green);font:400 .8em/1 sans-serif;padding:0 .42em}
+.edit-line{position:absolute;right:0;top:50%;transform:translateY(-50%);color:var(--green);background:var(--active);border:1px solid var(--strong-line);padding:5px 8px;font-size:12px;border-radius:6px;opacity:0;pointer-events:none}
+.lyric-line:hover .edit-line,.lyric-line:focus-within .edit-line{opacity:1;pointer-events:auto}
+.lyric-line.active .edit-line{opacity:.85;pointer-events:auto}
+.dictionary-panel{background:var(--panel);border-left:1px solid var(--line);color:var(--ink)}.dictionary-panel #dictReading,.dictionary-panel .tag,.dict-footnote,.dictionary-panel p{color:var(--muted)}.dictionary-panel h2{color:var(--ink)}
+.empty-orbit{background:none;border:0;padding:0;width:68px;height:68px;border-radius:12px;overflow:hidden;margin-bottom:10px}.empty-orbit:before{display:none}.empty-orbit img{width:100%;height:100%}.empty h2{font:600 24px/1.4 "Microsoft YaHei UI",sans-serif;color:var(--ink)}.empty p,.empty .text-button{color:var(--muted)}
+/* 一块底板内左侧认歌，右侧练唱。进度读数使用等宽数字，不随毫秒跳动改变布局。 */
+.player {grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); grid-template-areas:"seek seek seek" "track controls tools"; align-items:center; gap:6px 24px; padding:12px clamp(16px,2.2vw,38px); border-top:1px solid var(--strong-line); background:var(--panel); position:relative}
+.now-playing {grid-area:track; min-width:0; display:flex; align-items:center; gap:11px}
+#albumCover {width:54px; height:54px; flex:none; object-fit:cover; border-radius:7px; background:var(--control)}
+.now-playing .track-info {flex:0 1 auto; min-width:0; padding:0}
+.now-playing .track-info :is(h2,p) {display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:0}
+.now-playing h2 {font:650 16px/1.5 "Microsoft YaHei UI",sans-serif; color:var(--ink)}
+.now-playing p {font-size:12px; line-height:1.6; color:var(--muted)}
+.now-playing {max-width:365px}
+.current-track-actions {display:flex; flex-direction:row; gap:3px; margin:0}
+.current-track-actions button {width:28px; height:26px; min-height:0; padding:4px; border-radius:5px; color:var(--ink)}
+.favorite-button[aria-pressed=true] {background:var(--active); color:var(--green)}
+.player .player-controls {grid-area:controls; display:flex; align-items:center; gap:9px; margin:0; min-width:0}
+.deck-tools {grid-area:tools; display:flex; align-items:center; justify-content:flex-end; gap:8px}
+.player .seek-row {grid-area:seek; gap:8px}
+.seek-row output,.seek-row output:last-child,.speed-label,.ab-controls,.nudge {color:var(--muted)}
+.seek-row output {min-width:57px; font:11px/1.3 Consolas,monospace}
+.play-button,.primary-button {background:var(--green); color:var(--on-accent); box-shadow:none}
+.play-button {width:38px; height:38px}
+.player .control-divider {background:var(--line)}
+.player .loop-button,#desktopQuick {display:inline-flex; align-items:center; gap:6px; height:32px; color:var(--ink); background:var(--control); border:1px solid var(--strong-line); border-radius:6px; padding:0 9px; white-space:nowrap; font-size:12px}
+#desktopQuick svg {width:16px; height:16px}
+#desktopQuick[aria-pressed=true],.player .loop-button[aria-pressed=true] {background:var(--active); color:var(--green); border-color:var(--green)}
+.ab-controls,.nudge {display:flex; align-items:center; border:1px solid var(--strong-line); border-radius:6px; background:var(--control)}
+.ab-controls button,.nudge button {color:var(--ink); min-height:28px}
+.nudge span {color:var(--muted); border-color:var(--line)}
+.speed-label select {cursor:pointer; height:32px}
+#loopHint {position:absolute; bottom:100%; left:50%; transform:translateX(-50%); padding:3px 12px; font-size:12px; color:var(--green); background:var(--panel); border:1px solid var(--line); border-radius:6px 6px 0 0}
+.return-to-line {position:absolute; right:16px; bottom:12px; color:var(--on-accent); background:var(--green); border-radius:16px; padding:7px 14px; box-shadow:0 2px 10px #0003; font-size:13px}
+.empty>div:last-child {display:flex; align-items:center; gap:8px}
+.empty #emptyOpen {width:auto; margin:0; background:var(--panel); color:var(--ink); border-color:var(--strong-line); padding:10px 16px}
+dialog,#libraryDialog{color:var(--ink);background:var(--panel);border:1px solid var(--strong-line);border-radius:15px;box-shadow:0 22px 80px #0005}
+dialog::backdrop{background:rgb(6 6 10 / 62%)}dialog .modal-title,.library-header{border-bottom:1px solid var(--line);padding-bottom:12px}.modal-title h2,.library-header h2{color:var(--ink);font-size:21px}
+dialog .close-dialog{color:var(--muted);background:var(--control);border-radius:50%}dialog input:not([type=range]):not([type=checkbox]):not([type=color]),dialog select,dialog textarea,.client-directory,.lyric-font-preview{background:var(--control);border-color:var(--strong-line);color:var(--ink)}
+dialog .muted,dialog p,dialog form>p,.modal-title+p,.setting-row span,.help-copy p,.track-subtitle,.text-button,.outline-button{color:var(--muted)}
+dialog .outline-button{background:transparent;border-color:var(--strong-line)}.inline-error,.client-path-error,#segmentError,#pasteError{color:var(--danger)!important}
+#toolsDialog{width:min(760px,92vw);height:min(555px,84vh);max-height:none;overflow:hidden;padding:0}#toolsDialog[open]{display:flex;flex-direction:column}
+#toolsDialog>.modal-title{margin:0;padding:16px 24px;flex:none}
+.pref-layout{display:grid;grid-template-columns:145px minmax(0,1fr);min-height:0;flex:1}
+.pref-nav{padding:16px 9px;background:var(--panel);border-right:1px solid var(--line)}.pref-nav button{display:block;width:100%;text-align:left;color:var(--muted);margin:2px 0;padding:10px 12px;border-radius:7px;font-size:14px}
+.pref-nav button[aria-pressed=true]{color:var(--green);background:var(--active)}
+.pref-body{overflow:auto;min-height:0;padding:22px 25px;scrollbar-gutter:stable}.pref-body h3{font-size:18px;margin:0 0 15px}.pref-body p{font-size:13px;line-height:1.7;color:var(--muted)}
+.pref-checks,.color-picks{gap:8px 13px}.color-picks{padding:6px 0;border-block:1px solid var(--line)}
+.pref-body .setting-row{border-color:var(--line)}.pref-body output{min-width:38px}.credits{padding-top:12px;border-top:1px solid var(--line)}.credits .author,.credits .version{color:var(--muted)}
+#deskPreview{display:grid;place-items:center;min-height:110px;background:#777782 repeating-linear-gradient(45deg,#777782 0 10px,#888896 10px 20px);border-radius:8px;overflow:hidden}
+#deskSwatch{width:100%;text-align:center;padding:9px;line-height:1.25;text-shadow:-1px -1px #202027,1px -1px #202027,-1px 1px #202027,1px 1px #202027}#deskSwatch>*{display:block}#deskSwatch small{font-size:.57em}#deskSwatch span{font-size:.62em}
+#segmentDialog{width:min(600px,90vw)}#segmentForm label{display:block;color:var(--muted);font-weight:550}#segmentForm input{font-size:17px;padding:10px}
+.cut-tools{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}.cut-tools button,#resetSentence{border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+.library-tabs,.library-header,.library-pagination{background:var(--panel);border-color:var(--line)}.library-tabs button{padding-inline:11px;color:var(--muted)}
+.playlist-sidebar,.segmented{background:var(--sidebar);border-color:var(--line)}.library-tabs button[aria-selected=true],.playlist-item.selected,.segmented button[aria-pressed=true]{background:var(--active);color:var(--green)}
+.library-search{background:var(--control);border-color:var(--strong-line)}.library-track{border-color:var(--line)}.library-track.current-track,.library-feedback:not(.error){background:var(--active);color:var(--green)}.track-play-icon,.track-row-actions .small[aria-pressed=true]{background:var(--active);color:var(--green)}.source-badge,.playlist-heading,.playlist-note,.tag{color:var(--muted);border-color:var(--strong-line)}.track-unavailable{color:var(--warning)}
+.search-result,.playlist-choice,.dict-footnote,.setting-row,.help-copy h3,.app-update,.client-setting{border-color:var(--line)}.help-copy h3{color:var(--ink)}.search-result strong,.dict-word,.track-text strong{color:var(--ink)}#toast:empty{display:none}
+@media(max-height:760px) {
+  .sidebar {padding-top:15px}
+  .brand {margin-bottom:20px}
+  .source-actions {margin-bottom:16px; padding-bottom:14px}
+  .score-bar {padding-block:12px}
+  .lyric-line {padding-block:10px}
+  .lyrics {padding-top:13px}
+}
+@media(max-width:1100px) {
+  .score-bar {gap:7px; padding-inline:12px}
+  .score-bar h1 {font-size:18px}
+  .score-bar .display-switches span {padding-inline:6px}
+  .player {column-gap:16px}
+  .player .player-controls {gap:6px}
+  .lyrics {padding-inline:clamp(12px,4vw,40px)}
+}
+@media(prefers-reduced-motion:no-preference){.edit-line,.lyric-original,.lyric-translation{transition:color 140ms,opacity 120ms}.pref-body>section:not([hidden]){animation:pref-in .16s ease-out}@keyframes pref-in{from{opacity:.65;transform:translateX(4px)}to{opacity:1;transform:none}}}
+
+
+input[type=range]{background:linear-gradient(90deg,var(--green) var(--progress,0%),var(--strong-line) var(--progress,0%))}
+input[type=range]::-webkit-slider-thumb{border-color:var(--panel)}
+.control-divider,.nudge button,.dict-footnote{border-color:var(--line)}.ab-controls button.marked{background:var(--active);color:var(--green)}
+#deskPreview{background:linear-gradient(115deg,#a3a3af,#50525c)}
+
+.segmented button:not([aria-pressed=true]){color:var(--muted)}
+.danger-button{color:#381714;background:var(--danger)}.danger-button:hover{color:#381714;background:var(--danger)}
+button.primary-button:hover,.player button.play-button:hover{color:var(--on-accent);background:var(--green)}
+input::placeholder,textarea::placeholder{color:var(--quiet)}
+
+/* 主题色先作用于工作台；所有模态页和原生选择控件也继承同一明度。 */
+.theme-preview{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:18px;text-align:center}
+.theme-preview div{font-size:12px;color:var(--muted);margin-bottom:8px}.theme-preview strong{font-size:27px;font-weight:500}.theme-preview em{font-style:normal;color:var(--green)}.theme-preview span{display:block;font-size:13px;margin-top:5px;color:var(--muted)}
+.theme-pickers{display:flex;gap:15px;flex-wrap:wrap;margin:15px 0}.theme-pickers label{display:flex;align-items:center;gap:6px}.theme-pickers input{width:32px;height:30px;padding:2px;border:1px solid var(--line);border-radius:5px}
+#themeContrast:not(:empty){color:var(--warning)}#themeContrast:empty{display:none}
+.primary-button,.play-button,.danger-button{color:var(--on-accent)}.danger-button,.danger-button:hover{color:var(--paper)}
+#pref-theme .setting-row .segmented{margin-left:auto}
+input::placeholder,textarea::placeholder{color:var(--quiet)}
+
+/* 不给禁用控件套用悬停或按压效果。键盘环与勾选标记不依赖亮暗主题。
+   动画只用于低频的开关、面板与操作反馈，不在逐字刷新或进度条上触发。 */
+:is(.source-actions,.score-tools,.player) button:enabled:hover,
+.score-bar .display-switches label:hover input:not(:checked)+span {background:var(--hover); border-color:var(--muted)}
+#connectCloud:enabled:hover,.player .play-button:enabled:hover,.return-to-line:hover {background:color-mix(in srgb,var(--green) 88%,var(--ink)); color:var(--on-accent)}
+:is(.source-actions,.player) button:disabled,.player select:disabled {color:var(--quiet); background:transparent; border-color:var(--line); opacity:.62; cursor:not-allowed}
+#connectCloud[aria-busy=true] {background:var(--active); color:var(--muted); cursor:progress}
+.library-track button:enabled:hover,dialog .outline-button:enabled:hover {background:var(--hover); color:var(--ink)}
+@media(prefers-reduced-motion:no-preference) {
+  .score-tools button,.display-switches span,.sidebar button,.player button {transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out}
+  #versionsFold .disclosure {transition:transform 140ms ease-out}
+  #sessionStatus:popover-open,#importPopover:popover-open,.return-to-line:not([hidden]) {animation:reveal-tool 150ms cubic-bezier(.18,.8,.25,1)}
+  @keyframes reveal-tool {from {opacity:.35; translate:0 4px} to {opacity:1; translate:0 0}}
+}
+
+/* 查到的词保持底线直到点选下一个词；词典列与谱面共用上下边界，正文和操作分层。 */
+.dict-on .token[data-clickable=true]:hover,.dict-on .token.looked-up {
+  background:var(--active); box-shadow:0 2px 0 var(--green); border-radius:3px
+}
+.dictionary-panel {width:clamp(196px,19vw,280px); margin:0; padding:14px 18px;}
+.dict-heading {border-bottom:1px solid var(--line); padding:0 0 8px}
+.dict-heading strong {color:var(--ink); font-size:14px}
+.dict-heading button {color:var(--muted); background:var(--control)}
+.dict-divider {border-top:1px solid var(--line); margin:16px 0}
+.dictionary-panel .definition {color:var(--ink); font-size:14px; line-height:1.7}
+.dictionary-panel #dictReading,#dictEmpty svg {color:var(--green)}
+#dictEmpty h3 {font:600 16px/1.5 "Microsoft YaHei UI",sans-serif; color:var(--ink)}
+#dictContent .text-button {font-size:12px; padding:6px 9px; border-radius:6px; border:1px solid var(--strong-line); background:var(--control); color:var(--ink)}
+#dictContent .text-button:hover {background:var(--hover)}
+
+/* 标题与五项能力保持同排。窄窗口把字号和版本工具放在下一排，但不需要展开任何面板。 */
+.score-size {display:inline-flex; gap:6px; align-items:center; color:var(--muted); font-size:12px; white-space:nowrap}
+.score-size input {width:66px; cursor:pointer}
+.score-size output {min-width:2ch; font-variant-numeric:tabular-nums; color:var(--ink)}
+#versionsFold .disclosure {width:14px; height:14px; stroke-width:1.7; fill:none}
+.score-bar {column-gap:12px}
+@media(max-width:1240px){
+  .score-bar{display:grid; grid-template-columns:auto minmax(0,1fr); row-gap:9px}
+  .score-bar .display-switches{justify-self:start}
+  .score-size{grid-row:2;grid-column:1/3;justify-self:start}
+  .score-tools{grid-row:2;grid-column:2;justify-self:end}
+}
+#playerVolumePanel {position:fixed;inset:auto;margin:0;width:235px;padding:15px 16px;color:var(--ink);background:var(--panel);border:1px solid var(--strong-line);border-radius:10px;box-shadow:0 8px 32px #0004}
+#playerVolumePanel>div {display:flex;align-items:center;justify-content:space-between;font-size:14px}
+#playerVolumePanel output {color:var(--green);font-variant-numeric:tabular-nums}
+#playerVolumePanel input {display:block;margin:16px 0;width:100%}
+#playerVolumePanel p {font-size:12px;line-height:1.55;color:var(--muted);margin:0}
+#volumeButton svg{width:16px;height:16px}
+.ab-controls button:not(#clearLoop){width:auto;padding:0 7px;white-space:nowrap;font-size:12px}
+.player {grid-template-columns:minmax(140px,1fr) auto minmax(max-content,1fr);column-gap:14px}
+.nudge span {font-size:11px;padding-inline:5px}
+@media(max-width:1110px){
+  .deck-tools {gap:5px}.player .player-controls{gap:4px}
+  .player{padding-inline:12px;column-gap:8px}.now-playing{gap:6px}#albumCover{width:44px;height:44px}
+  .speed-label{font-size:0;gap:0}.speed-label select{font-size:12px}
+}
+/* 给编辑动作留独立外侧栏；最长歌词的最后一个字与按钮也有固定净距。 */
+.lyrics {padding-inline:clamp(12px,2.4vw,42px)}
+.lyric-line {max-width:1100px;padding-inline:clamp(76px,6.5vw,100px)}
+.edit-line {right:4px}
+.lyric-line.active:not(:hover):not(:focus-within) .edit-line {opacity:.58}
+#deskSwatch rt {font-size:.5em;line-height:1}
+
+/* 不接管滑块的部件绘制：伪元素滑块在 Chromium 里不能沿用完整的原生拖动路径。
+   标准属性只提供主题色；保留系统滑块命中宽度、轨道翻页，以及强制对比度模式。 */
+@media (forced-colors:none) {
+  :root {scrollbar-color:var(--quiet) transparent}
+}
+.desktop-pair {display:inline-flex;align-items:stretch;white-space:nowrap}
+.desktop-pair #desktopQuick {border-radius:6px 0 0 6px}
+.quick-pin,.shadow-choice {display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.quick-pin {border:1px solid var(--strong-line);border-left:0;border-radius:0 6px 6px 0;background:var(--control);padding-inline:7px;color:var(--ink);font-size:12px}
+.quick-pin input,.shadow-choice input {margin:0;accent-color:var(--green);cursor:pointer}
+.quick-pin:hover {background:var(--hover)}
+.quick-pin:has(:checked) {background:var(--active);color:var(--green)}
+.quick-pin:focus-within {outline:2px solid var(--green);outline-offset:1px}
+.shadow-choice {font-size:13px;min-height:30px}
+.reading-cut {color:var(--green);padding-inline:.32em}
+/* 预览和浮窗一样只衬字形，不给整块预览区域增加黑底。 */
+#deskSwatch.has-shadow {text-shadow:-1px -1px #202027,1px -1px #202027,-1px 1px #202027,1px 1px #202027,0 3px 5px #10121a,0 4px 9px #10121a}
+
+/* 小窗将两项曲库操作纵向排列，避免新增钉住开关挤得歌名只剩一个字。 */
+@media(max-width:1060px){
+  .now-playing .current-track-actions {flex-direction:column;gap:0}
+  .now-playing .current-track-actions button {height:22px}
+}

@@ -71,6 +71,9 @@ def main():
                         state.cantonese && $('cantoneseToggle').checked &&
                         state.lines[0]?.cantoneseTokens?.[0].reading==='ngo5' &&
                         lyricRows[0]?.querySelector('rt')?.textContent==='ngo5'});
+                      checks.push({check:'旧版折叠偏好升级后仍可见五个开关', passed:
+                        $('versionsGroup').hidden && [...document.querySelectorAll('.display-switches input')]
+                          .filter(el=>el.getBoundingClientRect().width>0).length===5});
                       window.__featureResult={checks,errors:window.__errors};
                     })();
                 """))

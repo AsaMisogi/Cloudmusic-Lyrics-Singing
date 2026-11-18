@@ -7,7 +7,8 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 root = Path(SPECPATH)
 datas = [(str(root / name), name) for name in ("web", "samples")]
 datas += [(str(root / "assets" / name), "assets") for name in
-          ("icon.svg", "icon.ico", "landscape.svg", "reading-corrections.json", "chime.wav")]
+          ("icon.svg", "icon.ico", "landscape.svg", "sleeve.svg", "wechat-appreciation.png",
+           "reading-corrections.json", "chime.wav")]
 datas += [(str(root / "utatomo/client_bridge.js"), "utatomo")]
 binaries = []
 hiddenimports = []
@@ -46,5 +47,5 @@ pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="Utatomo",
           icon=str(root / "assets/icon.ico"),
           debug=False, bootloader_ignore_signals=False, strip=False,
-          upx=False, console=True)
+          upx=False, console=False)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="Utatomo")

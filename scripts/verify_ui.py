@@ -30,7 +30,8 @@ def start(ok):
     if not ok:
         app.exit(2)
         return
-    page.runJavaScript((ROOT / "scripts/verify_ui.js").read_text(encoding="utf-8"))
+    hz = view.screen().refreshRate()
+    page.runJavaScript(f"onEvent('displayInfo',{{refreshRate:{hz},unlimited:true}});" + (ROOT / "scripts/verify_ui.js").read_text(encoding="utf-8"))
     timer.start(100)
 
 def poll():
@@ -39,7 +40,7 @@ def poll():
 
 
 def capture(name):
-    if name in {"library", "settings"}:
+    if name in {"library", "settings", "support"}:
         view.grab().save(str(output / f"ui-{name}.png"))
 
 def finish(raw):

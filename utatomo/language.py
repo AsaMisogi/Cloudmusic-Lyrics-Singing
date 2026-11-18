@@ -33,6 +33,54 @@ def hiragana(value: str) -> str:
     )
 
 
+def ruby_parts(text: str, reading: str) -> list[dict]:
+    """用送假名作锚点，正反各扫描一次。仅边界唯一时拆分，否则整词保留唱法。
+
+    例如「取り戻す」分成 取(と)・り・戻(もど)・す，而「明日」不猜每个汉字各唱几拍。
+    结果只保存文字与读音；两种视图共用同一结果，词典仍以整个词为单位。
+    """
+    pieces = re.findall(r"[\u3400-\u9fff々]+|[^\u3400-\u9fff々]+", text)
+    kana = hiragana(reading)
+    def anchors(parts, sound):
+        cursor, positions = 0, []
+        for i, part in enumerate(parts):
+            if HAN.search(part):
+                cursor += 1  # 汉字组至少需要一个读音字符
+                continue
+            literal = hiragana(part)
+            if i == 0:
+                start = 0 if sound.startswith(literal) else -1
+            elif i == len(parts)-1:
+                start = len(sound)-len(literal) if sound.endswith(literal) else -1
+            else:
+                start = sound.find(literal, cursor)
+            if start < cursor:
+                return None
+            positions.append((start, start+len(literal)))
+            cursor = start+len(literal)
+        return positions if cursor <= len(sound) else None
+
+    fallback = [{"text": text, "reading": reading}]
+    if not HAN.search(text) and hiragana(text) == kana:
+        return [{"text":text,"reading":""}]
+    if not reading or not HAN.search(text) or len(pieces) == 1:
+        return fallback
+    early = anchors(pieces, kana)
+    late = anchors([p[::-1] for p in reversed(pieces)], kana[::-1])
+    if early is None or late is None or early != [(len(kana)-b, len(kana)-a) for a,b in reversed(late)]:
+        return fallback
+    start, j, result = 0, 0, []
+    for part in pieces:
+        if HAN.search(part):
+            end = early[j][0] if j < len(early) else len(kana)
+            result.append({"text": part, "reading": kana[start:end]})
+        else:
+            start = early[j][1]
+            j += 1
+            result.append({"text": part, "reading": ""})
+    return result
+
+
 def to_ipa(phones: list[str]) -> str:
     """CMU ARPAbet 转宽式美式 IPA。标注声调重音，保留词典的不确定性。"""
     result = []
@@ -259,6 +307,20 @@ class Annotator:
             line.pop("cantoneseTokens", None)
             # 缓存里的词典结果不能被歌曲注音 / 用户修正改写。
             tokens = [dict(token) for token in self.annotate(line["text"])]
+            # 若一条显式注音跨过分词边界，以作者标记为一个词；无冲突时保留原分词。
+            for hint in line.get("inlineReadings", []):
+                start, end = hint["start"], hint["start"] + len(hint["text"])
+                boundaries, cursor = [0], 0
+                for token in tokens:
+                    cursor += len(token["text"])
+                    boundaries.append(cursor)
+                if any(start < boundary < end for boundary in boundaries):
+                    left = next(i for i in range(len(tokens)) if boundaries[i+1] > start)
+                    right = next(i for i in range(left,len(tokens)) if boundaries[i+1] >= end)
+                    prefix = line["text"][boundaries[left]:start]
+                    suffix = line["text"][end:boundaries[right+1]]
+                    group = dict(tokens[left], text=hint["text"], lemma=hint["text"], language="ja")
+                    tokens[left:right+1] = [*map(dict,self.annotate(prefix)), group, *map(dict,self.annotate(suffix))]
             readings = align_reading(tokens, line.get("pronunciation", ""))
             references = [(align_reading(tokens, item["pronunciation"]), item["source"])
                           for item in line.get("readingReferences", [])]
@@ -309,12 +371,14 @@ class Annotator:
                     self.romanize(roman_reading)
                     if token["language"] == "ja" and roman_reading else ""
                 )
+                if token["language"] == "ja" and token["reading"]:
+                    token["rubyParts"] = ruby_parts(token["text"], token["reading"])
                 cursor += len(token["text"])
             line["tokens"] = tokens
             line["readingSource"] = "song" if readings else "dictionary"
             chinese = (HAN.search(line["text"]) and not re.search(r"[ぁ-ゖァ-ヶ]", line["text"])
                        and (not japanese_document or line.get("language") == "zh"))
-            if chinese:
+            if chinese and not line.get("inlineReadings"):
                 line["cantoneseTokens"] = self._cantonese_tokens(line, scope, line_key)
         return lines
 

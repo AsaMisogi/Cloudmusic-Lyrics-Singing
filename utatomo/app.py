@@ -22,10 +22,15 @@ from pathlib import Path
 # Qt WebEngine 的部分 Windows 版本使用固定 60 Hz begin-frame 限制。
 # 在初始化 Chromium 前去除该上限；保留硬件加速与操作系统合成。
 # 排障时可设 UTATOMO_SYSTEM_VSYNC=1 恢复引擎默认值。
-if os.environ.get("UTATOMO_SYSTEM_VSYNC") != "1":
-    chromium_flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
-    if "--disable-frame-rate-limit" not in chromium_flags:
-        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (chromium_flags + " --disable-frame-rate-limit").strip()
+chromium_flags = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+if os.environ.get("UTATOMO_SYSTEM_VSYNC") != "1" and "--disable-frame-rate-limit" not in chromium_flags:
+    chromium_flags += " --disable-frame-rate-limit"
+# 使用随引擎发布的 Fluent 滑块：保留系统命中宽度和合成器拖动，字形与主题交给平台。
+# 若启动者已指定 Chromium 的功能列表，沿用其选择，不用第二个同名参数覆盖它。
+if sys.platform == "win32" and "--enable-features" not in chromium_flags and "FluentScrollbar" not in chromium_flags:
+    chromium_flags += " --enable-features=FluentScrollbar"
+if chromium_flags:
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = chromium_flags.strip()
 
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot, QLockFile, Qt
 from PySide6.QtGui import QDesktopServices, QIcon, QFontDatabase
@@ -36,9 +41,13 @@ from PySide6.QtWebEngineCore import (
     QWebEngineSettings,
     QWebEngineProfile,
 )
-from PySide6.QtWebEngineWidgets import QWebEngineView
+from .scroll_input import PracticeWebView
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow
 
+from .line_edits import apply_text
+from .desktop import MainWindow, Desktop, startup
+from .profile import apply_pending, export_backup, stage_backup, read_map, write_map
+from PySide6.QtWidgets import QMessageBox
 from .language import Annotator
 from .lyrics import align_translation, align_pronunciation, parse_lyrics, read_text
 from .media import CloudMedia
@@ -57,6 +66,12 @@ LOG = logging.getLogger(__name__)
 
 class LocalPage(QWebEnginePage):
     """桥接只给项目的本地界面使用；外部网页一律交给系统浏览器。"""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        # Qt WebEngine 默认关闭原生平滑滚动。由 Chromium 处理物理滚轮的插值，
+        # 输入单位由 PracticeWebView 校准；页面不截断滚轮，也不叠加自己的惯性。
+        self.settings().setAttribute(QWebEngineSettings.WebAttribute.ScrollAnimatorEnabled, True)
 
     def acceptNavigationRequest(self, url, navigation_type, is_main_frame):
         if (
@@ -91,6 +106,7 @@ class Bridge(QObject):
             "artist": "在网易云播放歌曲，或打开本地音频",
         }
         self.identity = ""
+        self.cloud_sample_time = time.monotonic()
         self.cloud_state = {"connected": False}
         self.ready = False
         self.loop_region = None
@@ -131,6 +147,8 @@ class Bridge(QObject):
         self.update_manual = False
         self.update_url = ""
         self.closing = False
+        self.practice = read_map(DATA / "practice.json")
+        self.desktop = None
         self.annotator = None
         self.pending = []
         self.services = Services(DATA)
@@ -160,6 +178,7 @@ class Bridge(QObject):
         self.timer.timeout.connect(self._tick)
         self.timer.start()
         self.last_state_time = 0
+        self.last_local_sample = None
 
     def send(self, kind: str, data):
         if self.ready:
@@ -212,9 +231,22 @@ class Bridge(QObject):
             self.annotator = Annotator(DATA)
         return self.annotator.enrich(lines, scope)
 
+    @Slot(bool, str, str)
+    def setFrameTheme(self, dark, background, text):
+        """网页和原生标题栏使用同一色板，不写第二份主题配置。"""
+        from .window_frame import apply_frame_theme
+        apply_frame_theme(self.window, dark, background, text)
+
     @Slot()
     def initialize(self):
         self.ready = True
+        self.last_local_sample = None
+        if getattr(self,"desktop",None):
+            self.desktop.report()
+        if (DATA/"restored-display.json").exists():
+            restored=read_map(DATA/"restored-display.json")
+            if type(restored.get("startup")) is bool: startup(restored.pop("startup"))
+            self.send("restoreDisplay", restored)
         self.send("mode", {"mode": self.mode})
         self.send("track", self.metadata)
         self.send("cloud", self.cloud_state)
@@ -264,11 +296,108 @@ class Bridge(QObject):
             self._action(name, value)
         except Exception as exc:
             LOG.exception("操作失败：%s", name)
-            kind = "clientPathError" if name == "saveClientPath" else "correctError" if name == "correct" else "libraryError" if name.startswith("library") else "error"
+            kind = (
+                "clientPathError"
+                if name == "saveClientPath"
+                else "correctError"
+                if name == "correct"
+                else "libraryError"
+                if name.startswith("library")
+                else "error"
+            )
             self.send(kind, {"message": str(exc), "operation": name})
 
     def _action(self, name, value):
-        if name.startswith("library"):
+        if name == "desktopOption":
+            try:
+                self.desktop.change(value[0], value[1])
+            except Exception:
+                # 保存失败时把控件恢复到最后一次成功状态。
+                self.desktop.report()
+                raise
+        elif name == "displayRestored":
+            (DATA / "restored-display.json").unlink(missing_ok=True)
+        elif name == "desktopLine":
+            if self.desktop and self.lines and self.lines[0]["start"] is None:
+                self.desktop.manual = max(0, min(len(self.lines) - 1, int(value)))
+                self.desktop.tick()
+        elif name == "saveSegments":
+            idx = int(value["index"])
+            if not 0 <= idx < len(self.lines) or value["generation"] != self.generation:
+                raise ValueError("歌词已改变，请重新选择。")
+            line = self.lines[idx]
+            fields = {
+                k: str(value.get(k, "")).strip() for k in ("original", "kana", "roman")
+            }
+            if any(
+                v and (len(v) > 2000 or any(not part.strip() for part in v.split("/")))
+                for v in fields.values()
+            ):
+                raise ValueError("斜线之间不能为空，每项最多 2000 字。")
+            if fields["original"] == line.get("editSource", line)["text"]:
+                fields["original"] = ""
+            key = self._segment_key(line, idx)
+            edited = apply_text(line, fields)
+            self.generation += 1
+            scope = self._reading_scope()
+
+            # 只在语言线程生成改写后的注音；回到 GUI 线程验证歌曲仍一致后才提交。
+            def annotate_edit():
+                if not edited.get("tokens"):
+                    self._enrich([edited], scope)
+                return edited
+
+            self._work(
+                self.language_pool,
+                "lineEdited",
+                annotate_edit,
+                self.generation,
+                {"index": idx, "key": key, "fields": fields},
+            )
+        elif name == "editSegments":
+            self.send(
+                "segmentEditor",
+                dict(
+                    generation=self.generation,
+                    index=value if isinstance(value, int) else None,
+                ),
+            )
+        elif name in ("backupExport", "backupImport"):
+            if name == "backupExport":
+                if not self.library:
+                    raise ValueError(self.library_error)
+                path, _ = QFileDialog.getSaveFileName(
+                    self.window, "导出咏伴备份", "咏伴备份.zip", "备份 (*.zip)"
+                )
+                if path:
+                    export_backup(
+                        Path(path),
+                        DATA,
+                        self.library.db,
+                        dict(value, startup=startup()),
+                    )
+                    self.send("backupNotice", {"message": "备份已导出。"})
+            else:
+                path, _ = QFileDialog.getOpenFileName(
+                    self.window, "导入咏伴备份", "", "备份 (*.zip)"
+                )
+                if (
+                    path
+                    and QMessageBox.question(
+                        self.window,
+                        "恢复备份",
+                        "替换设置、曲库、歌词和注音修正（包括开机启动设置），并退出咏伴？下次打开即完成恢复。",
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.No,
+                    )
+                    == QMessageBox.Yes
+                ):
+                    stage_backup(Path(path), DATA)
+                    QApplication.quit()
+        elif name == 'pasteLyrics':
+            self._import_text(str(value),'粘贴的歌词')
+            self.send('pasteAccepted',{})
+        elif name.startswith("library"):
             self._library_action(name, value)
         elif name == "mode":
             if value not in ("local", "cloud") or value == self.mode:
@@ -290,6 +419,9 @@ class Bridge(QObject):
             self._send_library()
             if value == "local" and self.audio_path:
                 self._open_audio(self.audio_path)
+            elif self._saved_versions():
+                self.versions=self._saved_versions()
+                self._select_version(self.versions[0]["id"])
         elif name == "openAudio":
             path, _ = QFileDialog.getOpenFileName(
                 self.window,
@@ -316,14 +448,14 @@ class Bridge(QObject):
                     for version in self.versions:
                         if version["id"] == self.selected_version:
                             version["translation"] = text
+                    selected=next((v for v in self.versions if v['id']==self.selected_version),None)
+                    if selected: self._remember_import(dict(selected))
+                    if self.desktop: self.desktop.last=None
                     self.send(
                         "lyrics", {"lines": self.lines, "source": "导入的中文译文"}
                     )
                 else:
-                    key = "import:" + str(time.monotonic_ns())
-                    self.versions.append({"id": key, "label": Path(path).name,
-                                          "text": text, "translation": "", "source": Path(path).name})
-                    self._select_version(key)
+                    self._import_text(text, Path(path).name)
         elif name == "chime":
             self._play_chime()
         elif name == "toggle":
@@ -352,6 +484,23 @@ class Bridge(QObject):
                 self.cloud.command("rate", rate)
             else:
                 self.player.setPlaybackRate(rate)
+        elif name == "playerVolume":
+            # 来源在一次拖动期间可能改变。不得把旧滑块写入新播放器。
+            if value["mode"] != self.mode:
+                return
+            amount = value.get("percent")
+            if amount is not None and (type(amount) is not int or not 0 <= amount <= 100):
+                raise ValueError("音量范围为 0–100%。")
+            context = {"mode":self.mode,"request":value["request"]}
+            if self.mode == "local":
+                if amount is not None: self.audio.setVolume(amount/100)
+                self.send("playerVolume",{**context,"percent":round(self.audio.volume()*100)})
+            else:
+                from .mixer import cloud_level
+                directory=self.client_settings.directory
+                target=value.get("target")
+                if amount is not None and not target: raise ValueError("请重新打开音量。")
+                self._work(self.launch_pool,"playerVolume",lambda:cloud_level(directory,target,amount),extra=context)
         elif name == "volume":
             self.audio.setVolume(max(0, min(1, float(value))))
         elif name == "loop":
@@ -530,6 +679,7 @@ class Bridge(QObject):
             raise ValueError("未知操作：" + name)
 
     def _clear_track(self):
+        self.last_local_sample = None
         for future in self.pending:
             future.cancel()  # 取消尚未开始的旧歌曲任务；已在途请求由 generation 隔离。
         self.generation += 1
@@ -759,8 +909,11 @@ class Bridge(QObject):
         self.send("mode", {"mode": "local"})
         self.send("track", self.metadata)
         self._send_library()
-        lyric_files = [path.with_suffix(ext) for ext in (".yrc", ".lrc", ".txt")
-                       if path.with_suffix(ext).is_file()]
+        lyric_files = [
+            path.with_suffix(ext)
+            for ext in (".yrc", ".lrc", ".txt")
+            if path.with_suffix(ext).is_file()
+        ]
         if lyric_files:
             translation = next(
                 (
@@ -771,13 +924,79 @@ class Bridge(QObject):
                 None,
             )
             translated = read_text(translation) if translation else ""
-            self.versions = [{"id": str(lyric), "label": lyric.name,
-                              "source": lyric.name, "text": read_text(lyric), "translation": translated}
-                             for lyric in lyric_files]
+            self.versions = [
+                {
+                    "id": str(lyric),
+                    "label": lyric.name,
+                    "source": lyric.name,
+                    "text": read_text(lyric),
+                    "translation": translated,
+                }
+                for lyric in lyric_files
+            ]
+        saved = self._saved_versions()
+        self.versions = saved + [
+            v for v in self.versions if all(v["id"] != item["id"] for item in saved)
+        ]
+        if self.versions:
             self._select_version(self.versions[0]["id"])
         LOG.info("加载本地歌曲：%s", path)
 
-    def _load_text(self, text, translated="", source="", pronunciation="", references=None, issues=None):
+    def _save_practice(self, group, values):
+        # 写入成功才更新内存，避免界面声称已保存但重启后丢失。
+        updated = {**self.practice, group: values}
+        write_map(DATA / "practice.json", updated)
+        self.practice = updated
+
+    def _segment_key(self, line, index):
+        return json.dumps(
+            [
+                self._reading_scope(),
+                line["start"],
+                line.get("editSource",line)["text"],
+                index if line["start"] is None else None,
+            ],
+            ensure_ascii=False,
+        )
+
+    def _remember_import(self, item):
+        # 保留同一首歌的其他导入版本。最近使用的版本排首位，重开时离线可用。
+        items = [item] + [v for v in self._saved_versions() if v["id"] != item["id"]]
+        self._save_practice(
+            "imports",
+            {**self.practice.get("imports", {}), self._reading_scope(): items},
+        )
+
+    def _import_text(self, text, label):
+        if len(text.encode("utf-8")) > 4 * 1024**2:
+            raise ValueError("歌词超过 4 MB。")
+        parsed = parse_lyrics(text)
+        if not 1 <= len(parsed) <= 3000:
+            raise ValueError("请导入 1–3000 行歌词。")
+        item = dict(
+            id="import:" + str(time.time_ns()),
+            label=label,
+            source=label,
+            text=text,
+            translation="",
+        )
+        self._remember_import(item)
+        self.versions = [item] + self.versions
+        self._select_version(self.versions[0]["id"])
+
+    def _saved_versions(self):
+        item = self.practice.get("imports", {}).get(self._reading_scope())
+        return item or []
+
+    def _load_text(
+        self,
+        text,
+        translated="",
+        source="",
+        pronunciation="",
+        references=None,
+        issues=None,
+    ):
         lines = parse_lyrics(text)
         if not lines:
             raise ValueError("歌词文件中没有可用文本。")
@@ -788,14 +1007,29 @@ class Bridge(QObject):
         if pronunciation:
             align_pronunciation(lines, pronunciation)
         for line in lines:
-            line["readingReferences"] = [item for item in (references or [])
-                                         if normalize(item["text"]) == normalize(line["text"])]
+            line["readingReferences"] = [
+                item
+                for item in (references or [])
+                if normalize(item["text"]) == normalize(line["text"])
+            ]
         scope = self._reading_scope()
+        changes = [self.practice.get("segments", {}).get(self._segment_key(line,i), {}) for i,line in enumerate(lines)]
+
+        def prepare():
+            # 保留在整首歌语境中生成的源行，恢复练唱稿时不丢熟字训、粤拼或逐字时间。
+            annotated=self._enrich(lines,scope)
+            for i,fields in enumerate(changes):
+                if not fields: continue
+                edited=apply_text(annotated[i],fields)
+                if not edited.get("tokens"):
+                    self._enrich([edited],scope)
+                annotated[i]=edited
+            return annotated
         self.send("busy", {"message": "正在生成离线注音…"})
         self._work(
             self.language_pool,
             "annotated",
-            lambda: self._enrich(lines, scope),
+            prepare,
             self.generation,
             {"source": source, "timingIssues": issues or []},
         )
@@ -807,6 +1041,9 @@ class Bridge(QObject):
         self.selected_version = ""
         self._send_versions()
         self.send("busy", {"message": "正在读取网易云歌词…"})
+        if self._saved_versions():
+            self.versions=self._saved_versions()
+            self._select_version(self.versions[0]['id'])
         candidates = [dict(song) for song in self.candidates]
         selected = next((song for song in candidates if str(song["id"]) == str(song_id)),
                         dict(self.metadata) if str(self.metadata.get("songId")) == str(song_id) else {})
@@ -843,6 +1080,7 @@ class Bridge(QObject):
             return
         if kind == "cloud":
             self.cloud_state = payload
+            self.cloud_sample_time = time.monotonic()
             request = self.cloud_play_request
             if request and self.mode == "cloud" and payload.get("playing"):
                 matched = str(payload.get("songId") or "") == request["songId"] if payload.get("songId") else (
@@ -914,6 +1152,8 @@ class Bridge(QObject):
                     self.send("libraryNotice", {"message": "已向网易云发送播放请求，等待客户端确认…"})
             elif task == "update":
                 self._finish_update(data)
+            elif task == "playerVolume":
+                if extra["mode"] == self.mode: self.send("playerVolume",{**extra,**data})
             elif task == "clientPrepare":
                 directory = str(data["exe"].parent)
                 if data["running"]:
@@ -933,12 +1173,19 @@ class Bridge(QObject):
                     self.metadata["cover"] = data
                     self.send("cover", {"cover": data})
             elif task == "failure":
+                if data.get("task")=="playerVolume":
+                    if extra["mode"]==self.mode:
+                        self.send("playerVolume",{**extra,"message":"未能读取应用音量，请重新打开音量面板。"})
+                    return
                 if data.get("task", "").startswith("library"):
                     if data.get("task") == "libraryPlay":
                         if not self.cloud_play_request or extra.get("songId") != self.cloud_play_request["songId"]:
                             return
                         self.cloud_play_request = None
                     self.send("libraryError", data)
+                    return
+                if data.get("task") == "lineEdited":
+                    self.send("error",dict(data,operation="saveSegments"))
                     return
                 if data.get("task") == "corrected":
                     self.send("correctError", data)
@@ -962,10 +1209,26 @@ class Bridge(QObject):
                     )
                 else:
                     self.send("error", data)
+            elif task == "lineEdited":
+                saved=dict(self.practice.get("segments",{}))
+                if any(extra["fields"].values()): saved[extra["key"]]=extra["fields"]
+                else: saved.pop(extra["key"],None)
+                try:
+                    self._save_practice("segments",saved)
+                except OSError as exc:
+                    self.send("error",{"message":str(exc),"operation":"saveSegments"})
+                    return
+                self.lines[extra["index"]]=data
+                if self.desktop: self.desktop.last=None
+                self.send("segmentsSaved",dict(index=extra["index"],line=data))
             elif task == "corrected":
+                for i,line in enumerate(data):
+                    line["segments"]=self.practice.get("segments",{}).get(self._segment_key(line,i),{})
                 self.lines = data
                 self.send("readingCorrected", {"lines": data, "token": extra["token"]})
             elif task in ("annotated", "translated"):
+                for i,line in enumerate(data):
+                    line["segments"]=self.practice.get("segments",{}).get(self._segment_key(line,i),{})
                 self.lines = data
                 self.send(
                     "lyrics",
@@ -979,7 +1242,8 @@ class Bridge(QObject):
                 )
                 self.send("notice", {"message": f"已加载 {len(data)} 行歌词"})
             elif task == "downloaded":
-                self.versions = data
+                saved=self._saved_versions()
+                self.versions=saved+[v for v in data if all(v["id"]!=item["id"] for item in saved)]
                 if self.versions:
                     self._select_version(self.versions[0]["id"])
                 else:
@@ -1069,6 +1333,7 @@ class Bridge(QObject):
             self.player.play()
 
     def _tick(self):
+        if self.desktop and not self.desktop.animation.isActive(): self.desktop.tick()
         if self.cloud_play_request and time.monotonic() >= self.cloud_play_request["deadline"]:
             self.cloud_play_request = None
             self.send("libraryError", {"message": "网易云尚未确认切歌。请检查客户端是否可播放此曲（登录、VIP 或网盘权限），也可在客户端手动播放后重试。"})
@@ -1078,17 +1343,16 @@ class Bridge(QObject):
                 self._check_loop(self.player.position())
             if time.monotonic() - self.last_state_time > 0.08:
                 self.last_state_time = time.monotonic()
-                self.send(
-                    "playback",
-                    {
-                        "position": self.player.position(),
-                        "duration": self.player.duration(),
-                        "playing": self.player.isPlaying(),
-                        "rate": self.player.playbackRate(),
-                        "canSeek": self.player.isSeekable(),
-                        "canRate": True,
-                    },
-                )
+                sample = dict(position=self.player.position(), duration=self.player.duration(),
+                              playing=self.player.isPlaying(), rate=self.player.playbackRate(),
+                              canSeek=self.player.isSeekable(), canRate=True)
+                # 暂停位置不变时不重复跨进程送同一包；恢复页面 / 切换来源会重发第一包。
+                if sample != self.last_local_sample:
+                    self.last_local_sample = sample
+                    self.send("playback",sample)
+        interval = 20 if self.mode=="local" and self.player.isPlaying() else 90
+        if self.timer.interval()!=interval:
+            self.timer.setInterval(interval)
 
     def _play_chime(self):
         """按需创建独立音效播放器，不接入歌曲进度、模式、循环或播放状态。
@@ -1148,7 +1412,7 @@ def main():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-7s %(name)s | %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout), log_file],
+        handlers=[log_file] + ([logging.StreamHandler(sys.stdout)] if sys.stdout else []),
     )
     LOG.info("咏伴 Utatomo %s · 作者 @朝禊ASOGI", __version__)
     if sys.platform == "win32":
@@ -1163,14 +1427,15 @@ def main():
     if not lock.tryLock(100):
         LOG.error("咏伴已经运行，请切换到现有窗口。")
         return 1
-    window = QMainWindow()
+    apply_pending(DATA)
+    window = MainWindow()
     if "--smoke-test" in sys.argv and "--headless" in sys.argv:
         # 使用 Windows 字体与渲染后端验收，但窗口绝不映射到用户桌面。
         window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
-    window.setWindowTitle("咏伴 · Utatomo — 歌词跟唱助手")
+    window.setWindowTitle("咏伴 · Utatomo")
     window.resize(1360, 900)
     window.setMinimumSize(960, 700)
-    view = QWebEngineView(window)
+    view = PracticeWebView(window)
     # 验收使用临时 profile，避免示例中的词典开关、字号等覆盖用户偏好。
     if "--smoke-test" in sys.argv:
         profile = QWebEngineProfile(view)
@@ -1185,6 +1450,10 @@ def main():
     )
     channel = QWebChannel(page)
     bridge = Bridge(window)
+    if bridge._saved_versions():
+        bridge.versions=bridge._saved_versions()
+        bridge._select_version(bridge.versions[0]["id"])
+    window.desktop = bridge.desktop = Desktop(bridge,DATA/"desktop.json", smoke_data is not None)
     if smoke_data is not None:
         bridge.audio.setMuted(True)
         bridge.services.dictionary = lambda word, language: {
@@ -1194,11 +1463,22 @@ def main():
     window.setCentralWidget(view)
     view.setUrl(QUrl.fromLocalFile(str(ROOT / "web" / "index.html")))
     window.show()
-    def report_display():
+    def report_display(*_):
         screen = window.windowHandle().screen()
         bridge.send("displayInfo", {"refreshRate": round(screen.refreshRate(), 2),
                                     "unlimited": os.environ.get("UTATOMO_SYSTEM_VSYNC") != "1"})
-    window.windowHandle().screenChanged.connect(lambda *_: report_display())
+    # 换显示器或在系统设置中改变当前屏幕刷新率，都要重新分配绘制预算。
+    watched_screen = None
+    def watch_screen(screen):
+        nonlocal watched_screen
+        if watched_screen is not None:
+            watched_screen.refreshRateChanged.disconnect(report_display)
+        watched_screen = screen
+        if screen is not None:
+            screen.refreshRateChanged.connect(report_display)
+            report_display()
+    window.windowHandle().screenChanged.connect(watch_screen)
+    watch_screen(window.windowHandle().screen())
     page.loadFinished.connect(lambda *_: QTimer.singleShot(500, report_display))
     app.aboutToQuit.connect(bridge.close)
     # 自动化验证使用真实 Qt 页面与播放器；不更改用户正在播放的网易云歌曲。
@@ -1221,6 +1501,10 @@ def main():
             check("本地音轨时长 40 秒", bridge.player.duration() == 40000)
             # 同一入口也用于便携 EXE：验证新离线词典资源和 SQLite 原生模块确实随包可用。
             try:
+                # 只读枚举会话或得到无会话提示；便携包也须能加载 COM 绑定，不改动用户音量。
+                from .mixer import cloud_level
+                level = bridge.launch_pool.submit(cloud_level,bridge.client_settings.directory).result(timeout=6)
+                check("Windows 应用音量接口可读取", "percent" in level or level.get("message")=="请先在网易云播放音乐，再打开音量。")
                 pairs = Annotator._cantonese_candidates("廣東")
                 check("离线粤拼词典可用", [readings[0] for text, readings in pairs] == ["gwong2", "dung1"])
                 playlist = bridge.library.create_playlist("离线验收")

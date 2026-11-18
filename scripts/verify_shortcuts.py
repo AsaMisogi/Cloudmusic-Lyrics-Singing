@@ -28,6 +28,10 @@ for name, element in [("词典开关", "dictionaryToggle"), ("跟随下拉框", 
                  Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier,
                  "actions.length === 1 && actions[0][0] === 'toggle' && oldControl === JSON.stringify([document.activeElement.value, document.activeElement.checked])"))
 jobs += [
+    ("Enter 打开赞赏窗口", "$('supportButton').focus();", Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier,
+     "$('supportDialog').matches(':modal') && actions.length === 0"),
+    ("Esc 关闭赞赏窗口并返回入口", "", Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier,
+     "!$('supportDialog').open && document.activeElement === $('supportButton') && actions.length === 0"),
     ("Enter 仍可操作播放按钮", "$('play').focus();", Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier,
      "actions.length === 1 && actions[0][0] === 'toggle'"),
     ("Tab 仍可移动焦点", "$('followMode').focus();", Qt.Key.Key_Tab, Qt.KeyboardModifier.NoModifier,
@@ -82,6 +86,8 @@ def loaded(ok):
     page.runJavaScript("""
       window.actions = [];
       window.backend = {action: (name, raw) => actions.push([name, JSON.parse(raw)])};
+      // 跟随下拉框默认折叠；先展开，再用真实焦点验证按键，避免误测上一个按钮。
+      if ($('versionsGroup').hidden) $('versionsFold').click();
       onEvent('mode', {mode:'local'});
       onEvent('lyrics', {lines:[{start:0,end:5000,text:'Sing along',words:[],timing:'line'}]});
       updatePlayback({position:1000,duration:5000,playing:false,canSeek:true});

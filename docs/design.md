@@ -1,5 +1,26 @@
 # 界面设计
 
+## 当前界面 · 0.8.3
+
+「赞赏作者」固定在左侧设置下方，用暖金色礼物图标和描边区别于播放操作。弹窗从原海报中取景，保留完整码点、中心头像和白边；下方显示海报上的署名 Cerulean。码面保持原色，弹窗和关闭按钮跟随主题。
+
+第一次打开无需寻找「显示」菜单：「练唱谱」标题旁直接列出五个带文字的开关。勾形、底色和边界共同区分开关状态。进入「查词与修正注音」后，选择的词留有下划线，释义与「修正注音」操作紧邻。字号始终可见；只折叠版本与跟随，矢量箭头随展开状态旋转。分段按钮在外侧独立操作栏，不挤在原文末尾。
+
+播放来源和连接按钮同在左上，未连接时「连接客户端」使用强调色；实际直连成功后变为「查看连接」。来源、能力限制和时间轴精度集中在「播放信息」，退出面板后不在歌词旁残留状态条。底部通栏左侧为曲目身份与收藏，中间为播放和循环，右侧为桌面歌词、速度及微调。长曲名省略显示，悬停可查看全名。
+
+Windows 11 的系统标题栏取当前主题的背景和文字色，不另做网页窗口按钮。主要操作使用有边界的表面，悬停、键盘焦点、禁用和忙状态各有反馈；工具弹出使用短距离过渡。减少动态效果时不用这些过渡，不给播放进度或歌词尺寸加动画。
+
+设置采用固定标题、分类导航与独立滚动内容区。所有对话框继承主题并保留可见键盘焦点。分隔线不参与逐字定位，编辑控件不触发行跳转。桌面浮窗独立排版，透明底描边，未锁定悬停显示工具；主窗口隐藏不停止逐字着色。假名与对应原文组成一组、一起折行；英文、粤拼与罗马音各保留原来的语言单位。
+
+主题以背景、文字、强调色三个基色生成侧栏、表面、边框和交互状态；每个色板有独立的亮色与深色版本。首次使用紫灰深色。
+
+播放器把「桌面歌词」和「钉住」并排成组：前者控制可见，后者控制位置与鼠标穿透。浮窗默认透明；可选的阴影按照字形而非窗口边界绘制。钉住时无需靠猜测找到托盘入口：悬停三秒，指针侧边显示解锁键，不接管整块歌词。
+
+滑块直接采用 Chromium 的 Windows Fluent 样式，主题只设置滑块色和透明轨道。可点击的区域比可见滑块更宽；系统高对比度模式使用系统配色。手动分段只放大断点两侧的视觉留白，不更改唱词。
+
+下文为早期版本的设计记录。
+
+
 名称：**咏伴 · Utatomo**。图标将叶片与上扬的音符轮廓组合，表达陪伴练唱；署名为 **@朝禊ASOGI**，点击打开作者 B 站空间。
 
 ## 设计稿与实现
@@ -44,3 +65,7 @@
 ```text
 Use case: ui-mockup. Design a polished Windows desktop Japanese and English song learning application named 咏伴 UTATOMO. Wide 1536x1024 front-on app screenshot, no device frame. Warm ivory canvas, deep forest green accent, restrained orange current lyric progress, precise typography. Slim left sidebar 220px with abstract musical leaf monogram, app title 咏伴, navigation 网易云同步 and 本地歌曲, an elegant minimal album art square (abstract sun over rolling green hills), song metadata 晴れた日のうた, small author @朝禊ASOGI. Main large panel with top heading 跟着音乐，一句一句唱。, subtitle 假名 · 音标 · 中文释义, small toggles 注音 中文 词典模式. Middle roomy 4 lines of Japanese lyrics using original sample text: 朝の光を追いかけて / 新しい道を歩こう / 君と歌うこの歌を / 明日へそっと届けよう. Tiny hiragana ruby above kanji and smaller Chinese translation below each line. Current line in forest green with pale green rounded highlight, previous and next lines muted. Right small compact dictionary card 光 ひかり 光；光芒. Bottom player panel timestamp 00:18.240 / 03:42.000, thin fine seeking slider with green thumb, previous play next buttons, single line repeat 一句循环, speed 0.85×, fine adjustment ±0.1s. Lots of whitespace, simple beautiful professional desktop utility, subtle borders, no gradients on main UI, realistic implementable frontend design.
 ```
+
+## 0.5.0：把浮窗留给歌词
+
+移除封面、词典、曲库与空态的装饰标语。顶部保留一个桌面歌词开关；低频的配色、启动、托盘与备份折叠在设置中。原文为浮窗最大字号，注音在上、译文在下；钉住后整窗穿透，包括背景。对话框短距离进入，减少动态效果时不播放。

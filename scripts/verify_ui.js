@@ -59,12 +59,14 @@
   await wait(650);
   const row = lyricRows[6].getBoundingClientRect(), viewport = $('lyricViewport').getBoundingClientRect();
   check('向下跟随让当前行可见', row.top >= viewport.top - 2 && row.top < viewport.bottom);
-  $('lyricViewport').dispatchEvent(new WheelEvent('wheel', {deltaY: 100}));
+  const wheel = new WheelEvent('wheel', {deltaY: 120,cancelable:true});
+  $('lyricViewport').dispatchEvent(wheel);
+  check('滚轮整刻度不被脚本拦截', !wheel.defaultPrevented && state.scrollTarget===null);
   check('默认手动浏览不自动返回', state.follow && state.resumeFollowAt === Infinity);
   $('resumeAfterBrowse').click();
   check('设置可启用四秒自动返回', Number.isFinite(state.resumeFollowAt) && state.resumeFollowAt > performance.now());
-  state.resumeFollowAt = performance.now() + 80;
-  await wait(250);
+  // 走真实的四秒空闲计时，不通过改写内部截止时间模拟回到当前句。
+  await wait(4150);
   check('暂缓后自动恢复', state.resumeFollowAt === 0);
   check('默认歌词点击自动播放', state.playOnLyricSeek);
   lyricRows[2].click();
@@ -73,17 +75,49 @@
   lyricRows[3].click();
   check('关闭后仅定位', actions.at(-1)[0] === 'seek' && actions.at(-1)[1] === 9000);
   state.pendingSeek = null;
-  const expandedHeight = $('lyricViewport').clientHeight;
-  for (const [button] of foldGroups) $(button).click();
-  await wait(100);
-  const saved = JSON.parse(localStorage.getItem('utatomo-display'));
-  check('折叠释放歌词空间且持久保存', $('lyricViewport').clientHeight > expandedHeight + 70 && Object.values(saved.collapsed).every(Boolean));
+  // 最小窗口下检查实际几何和命中对象，避免「DOM 中存在」但被下一组按钮遮住。
+  const hit = el => {
+    const r = el.getBoundingClientRect(), target = document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    return r.width>0 && r.height>0 && (el===target || el.contains(target));
+  };
+  const heading = document.querySelector('.score-bar h1').getBoundingClientRect();
+  const switches = [...document.querySelectorAll('.display-switches input')];
+  check('五个练唱开关首次即与练唱谱同排且可点',switches.length===5 && switches.every(el=>{
+    const r=el.getBoundingClientRect(); return hit(el) && r.top<heading.bottom && r.bottom>heading.top;
+  }));
+  $('dictionaryToggle').click();
+  check('常驻词典开关直接打开查词面板',state.dict && !$('dictionaryPanel').hidden && hit($('closeDictionary')));
+  $('closeDictionary').click();
+  check('关闭词典后工具栏同步取消勾选',!$('dictionaryToggle').checked);
+  if ($('versionsGroup').hidden) $('versionsFold').click();
+  const expandedHeight=$('lyricViewport').clientHeight, panelHeight=$('versionsGroup').offsetHeight;
+  $('versionsFold').click();
+  const saved=JSON.parse(localStorage.getItem('utatomo-display'));
+  check('收起版本栏只释放其自身高度，练唱开关不消失',panelHeight>0 && Math.abs($('lyricViewport').clientHeight-expandedHeight-panelHeight)<=1 && saved.collapsed.versionsGroup && switches.every(hit));
   check('全局交互偏好持久保存', saved.playOnLyricSeek === false && saved.resumeAfterBrowse === true);
-  check('折叠后设置和搜索仍可用', $('moreButton').getBoundingClientRect().height > 0 && $('searchButton').getBoundingClientRect().height > 0);
-  for (const [button] of foldGroups) $(button).click();
-  onEvent('mode', {mode: 'cloud'});
-  check('云同步侧栏无多余滚动条', document.querySelector('.sidebar').scrollHeight <= document.querySelector('.sidebar').clientHeight);
-  onEvent('mode', {mode: 'local'});
+  check('紧凑布局不隐藏导入、对齐、设置或搜索',[...['importMenu','alignment','moreButton','searchButton'].map($)].every(hit));
+  onEvent('mode', {mode:'cloud'});
+  check('连接与音频入口在左侧首屏可命中',['connectCloud','openAudio','practiceButton'].map($).every(el=>hit(el) && el.getBoundingClientRect().bottom<innerHeight/2));
+  check('技术信息默认离开谱面',['lyricSource','timingHint','connectionLabel','lyricCounter'].map($).every(el=>el.closest('#sessionStatus') && !el.getClientRects().length));
+  onEvent('cloud',{connected:true,transport:'client',canSeek:true,hasTimeline:true,duration:72000,position:18000});
+  $('connectCloud').click();
+  check('播放信息显示实际连接与歌词来源',$('sessionStatus').matches(':popover-open') && $('connectionLabel').textContent.includes('直连') && $('lyricSource').textContent.includes('交互验收') && $('connectLabel').textContent==='查看连接');
+  $('sessionStatus').querySelector('button').click();
+  check('曲名封面与控件在同一底栏',['trackTitle','albumCover','favoriteCurrent','play','desktopQuick','seek'].every(id=>$(id).closest('.player')) && Math.abs(document.querySelector('.player').getBoundingClientRect().bottom-innerHeight)<=1);
+  check('窄窗口播放器没有重叠或截断',['play','lineLoop','desktopQuick','pinQuick','volumeButton','speed','nudgeForward','playlistCurrent'].map($).every(hit));
+  check('窄导航不会因同步来源溢出', document.querySelector('.sidebar').scrollHeight <= document.querySelector('.sidebar').clientHeight);
+  // 在最小窗口走实际入口，验证本地码图解码、关窗焦点和播放操作相互独立。
+  const support = $('supportButton'), popup = $('supportDialog'), beforeSupport = actions.length;
+  check('左下角赞赏入口可点', hit(support) && support.getBoundingClientRect().top >= $('moreButton').getBoundingClientRect().bottom);
+  support.focus(); support.click();
+  const code = popup.querySelector('img');
+  await code.decode().catch(() => {});
+  check('赞赏弹窗展示本地原图', popup.matches(':modal') && code.naturalWidth === 1210 && code.naturalHeight === 1210);
+  window.__uiCapture = 'support'; await wait(300); window.__uiCapture = null;
+  popup.querySelector('.close-dialog').click();
+  check('关窗后焦点返回赞赏入口且不发送播放指令', !popup.open && document.activeElement === support && actions.length === beforeSupport);
+  onEvent('mode',{mode:'local'});
+  $('versionsFold').click();
   $('quickFontSize').value = 52; $('quickFontSize').dispatchEvent(new Event('input'));
   check('主界面字号实时生效', $('fontSize').value === '52' && parseFloat(getComputedStyle(lyricRows[0].querySelector('.lyric-original')).fontSize) >= 49);
   onEvent('versions', {songs: [{id: 1, title: 'Studio', artist: 'Singer'}, {id: 2, title: 'Live', artist: 'Singer'}], songId: 1,
@@ -129,13 +163,9 @@
     previous=p;
   }
   check('量化快照不让行背景往回跳或字词突跳', reversals===0 && maxFrameStep<14);
-  const parts = text => rubyParts({text,reading:({'逃げ出し':'にげだし','取り戻す':'とりもどす','飛び出し':'とびだし','お祝い':'おいわい','明日':'あした'})[text],language:'ja'});
-  check('逃げ出し逐段 ruby 不重复内部假名', JSON.stringify(parts('逃げ出し')) === JSON.stringify(
-    [{text:'逃',reading:'に'},{text:'げ',reading:''},{text:'出',reading:'だ'},{text:'し',reading:''}]));
-  check('取り戻す和飛び出し保留内部假名', parts('取り戻す').map(p=>p.reading).join('|')==='と||もど|' && parts('飛び出し').map(p=>p.reading).join('|')==='と||だ|');
-  check('前后假名不重复注音', parts('お祝い').map(p=>p.reading).join('|')==='|いわ|');
-  check('熟字训保持整组不硬拆单汉字', parts('明日').length===1 && parts('明日')[0].reading==='あした');
-  const token = {text:'逃げ出し',reading:'にげだし',language:'ja',lemma:'逃げ出す',source:'本句用户校正'};
+  // 分词工作线程已生成锚点。这里验收 DOM 范围与整词查询，真实拆分输入由 Python 用例覆盖。
+  const grouped=[{text:'逃',reading:'に'},{text:'げ',reading:''},{text:'出',reading:'だ'},{text:'し',reading:''}];
+  const token = {text:'逃げ出し',rubyParts:grouped,reading:'にげだし',language:'ja',lemma:'逃げ出す',source:'本句用户校正'};
   onEvent('lyrics',{lines:[{start:0,end:5000,text:'逃げ出し',tokens:[token],words:[],timing:'line'}]});
   const baseSpans=[...lyricRows[0].querySelectorAll('.token-base')];
   check('拆分后字符位置连续且原文不丢失', baseSpans.map(s=>s.textContent).join('')==='逃げ出し' && baseSpans.map(s=>s.dataset.start).join(',')==='0,1,2,3');
@@ -167,7 +197,7 @@
   editor.remove();
   // 罗马音只改变显示，保持词汇边界、当前行、逐字时间与用户校正所需的假名。
   check('日语罗马音默认关闭', !state.romaji && !$('romajiToggle').checked);
-  const romanTokens=[{text:'逃げ出し',reading:'にげだし',romaji:'nigedashi',language:'ja',lemma:'逃げ出す'},
+  const romanTokens=[{text:'逃げ出し',rubyParts:grouped,reading:'にげだし',romaji:'nigedashi',language:'ja',lemma:'逃げ出す'},
     {text:'コーヒー',reading:'',romaji:'koohii',language:'ja',lemma:'コーヒー'},
     {text:'Sing',reading:'sɪŋ',romaji:'',language:'en',lemma:'sing'}];
   onEvent('lyrics',{lines:[{start:0,end:6000,text:'逃げ出しコーヒーSing',tokens:romanTokens,
@@ -319,7 +349,7 @@
   state.lyricFont='已卸载的字体'; onEvent('lyricFonts',{families:['Microsoft YaHei']});
   check('卸载的字体显示原因并回到默认', state.lyricFont==='' && $('lyricFontHint').textContent.includes('未安装') && getComputedStyle(fontBase).fontFamily.includes('Microsoft YaHei'));
   $('playlistCurrent').click();
-  check('封面下当前歌可直接选择工具歌单', $('playlistPickerDialog').open && libraryUI.pickingCurrent);
+  check('底栏当前歌可直接选择工具歌单', $('playlistPickerDialog').open && libraryUI.pickingCurrent);
   $('playlistPickerList').querySelector('button').click();
   check('当前歌加入歌单传递稳定身份而非红心', actions.at(-1)[0]==='libraryMembership' && actions.at(-1)[1].current===true && actions.at(-1)[1].key==='cloud:123');
   onEvent('librarySaved',{operation:'libraryMembership'});
@@ -335,15 +365,28 @@
   onEvent('cloud',{connected:true,transport:'client'});
   check('直连成功不重复显示连接入口', $('libraryConnectCloud').hidden);
   $('libraryDialog').close();
+  const fontRect=$('quickFontSize').getBoundingClientRect();
+  const lineBox=lyricRows[0], editBox=lineBox.querySelector('.edit-line').getBoundingClientRect();
+  check('分段按钮与正文有独立操作间距',editBox.left-lineBox.querySelector('.lyric-original').getBoundingClientRect().right>=24);
+  check('字号无需展开版本栏即可命中',hit($('quickFontSize')) && fontRect.width>30 && !$('versionsGroup').contains($('quickFontSize')));
+  check('常驻查词开关直接告知可改音', $('dictionaryToggle').parentElement.textContent.includes('修正注音'));
+  // 在逐字着色和真实跟随均可运行的前景播放段取样，避免把 Chromium 静止页降频误当成播放帧率。
+  onEvent('mode',{mode:'local'});
+  onEvent('lyrics',{lines,source:'帧调度示例'});
+  updatePlayback({playing:true,canSeek:true,position:2900,duration:72000});
   // 直接采样 rAF 间隔，以证据确认是否仍被引擎锁在 60 FPS。
-  let stamps = [];
+  let stamps = [], paints=0;
+  const counter=new MutationObserver(()=>paints++);
+  counter.observe($('seek'),{attributes:true,attributeFilter:['style']});
   await new Promise(resolve => {
     const measure = stamp => { stamps.push(stamp); if (stamp - stamps[0] < 800) requestAnimationFrame(measure); else resolve(); };
     requestAnimationFrame(measure);
   });
+  counter.disconnect();
+  const paintHz=Math.round(paints*1000/(stamps.at(-1)-stamps[0]));
   const fps = (stamps.length - 1) * 1000 / (stamps.at(-1) - stamps[0]);
   check('最小窗口没有水平溢出', document.documentElement.scrollWidth <= innerWidth);
   check('最小窗口保留歌词空间', $('lyricViewport').clientHeight > 130);
   await wait(300);
-  window.__uiResult = {checks, errors: window.__errors, firstGeometry, modalEvidence, animationFramesPerSecond: Math.round(fps)};
+  window.__uiResult = {checks, errors: window.__errors, firstGeometry, modalEvidence, playbackPaintHz:paintHz, animationFramesPerSecond: Math.round(fps)};
 })().catch(error => {window.__uiResult = {checks: [], errors: [String(error)]};});

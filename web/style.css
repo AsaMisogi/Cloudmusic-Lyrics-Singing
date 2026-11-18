@@ -4,7 +4,7 @@
   --sidebar: #eeefe7;
   --ink: #243247;
   --green: #315ec5;
-  --muted: #667085;
+  --muted: #5f697b;
   --line: #dfe2d8;
   --active: #edf2ff;
   --sun: #315ec5;
@@ -95,7 +95,7 @@ button:active {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
+
 }
 .brand {
   display: flex;
@@ -406,8 +406,8 @@ header p {
   min-width: 0;
   flex: 1;
   position: relative;
-  scrollbar-width: thin;
-  scrollbar-color: #d4dccb transparent;
+
+
   overscroll-behavior: contain;
 }
 .lyrics {
@@ -598,7 +598,7 @@ rt {
   margin: 28px 26px 25px 0;
   padding: 0 0 0 23px;
   overflow-y: auto;
-  scrollbar-width: thin;
+
 }
 .dict-heading {
   display: flex;
@@ -678,12 +678,12 @@ rt {
 .seek-row output {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: #6a7962;
+  color: #596951;
   min-width: 63px;
 }
 .seek-row output:last-child {
   text-align: right;
-  color: #9ca593;
+  color: #596951;
 }
 input[type="range"] {
   appearance: none;
@@ -774,7 +774,7 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   gap: 3px;
   align-items: center;
-  color: #a1ab97;
+  color: #5d6b57;
   font-size: 10px;
 }
 .ab-controls button {
@@ -796,7 +796,7 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   gap: 10px;
   font-size: 10px;
-  color: #87937c;
+  color: #5d6b57;
   white-space: nowrap;
 }
 select {
@@ -1170,13 +1170,13 @@ rt { color: #4d5d75; font-size: .52em; font-weight: 550; line-height: 1.4; paddi
 .play-button:hover { background: #244a9f; }
 .loop-button[aria-pressed="true"], .ab-controls button.marked { background: #e2e9fb; color: #274c9d; }
 .player { background: #f4f6fa; }
-.player-hints, .muted { color: #667085; }
+.player-hints, .muted { color: #5f697b; }
 @media (max-width: 1150px) { .reading-toolbar { margin: 0 30px; } }
 
 /* 紧凑阅读布局：减少容器留白，行高仍由正文、ruby 和译文自然撑开。 */
 .top-actions { display: flex; align-items: center; gap: 8px; padding: 10px 24px 6px; flex-shrink: 0; }
 .fold-button, .settings-button { font-size: 12px; padding: 7px 10px; border-radius: 6px; white-space: nowrap; }
-.fold-button[aria-expanded="false"] { color: #667085; background: #edf0f4; }
+.fold-button[aria-expanded="false"] { color: #5f697b; background: #edf0f4; }
 .fold-button span { margin-left: 4px; }
 .toolbar { margin: 0 24px; padding: 7px 0; gap: 16px; border-top: 0; }
 .reading-toolbar { margin: 0 24px; padding: 8px 0; gap: 7px 14px; }
@@ -1225,4 +1225,23 @@ rt { color: #4d5d75; font-size: .52em; font-weight: 550; line-height: 1.4; paddi
   .sidebar { padding-top: 12px; }
   .brand { margin-bottom: 5px; }
   .version { display: none; }
+}
+/* 桌面工具保持次级层次；当前开关状态、焦点与按下状态各自可辨。 */
+#desktopQuick[aria-pressed="true"] { background:#e1eafc;color:#203f86; }
+.pref-section { border-bottom:1px solid var(--line); padding:12px 0; }
+.pref-section summary { cursor:pointer;font-weight:600; }
+.pref-section[open] summary { margin-bottom:12px; }
+.pref-checks,.color-picks,.practice-actions { display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin:10px 0; }
+.color-picks label,.pref-checks label {display:inline-flex;align-items:center;gap:6px;min-height:30px;}
+.color-picks input {width:34px;height:28px;padding:2px;cursor:pointer;}
+.practice-actions button {border:1px solid var(--line);border-radius:6px;padding:7px 12px;}
+#pasteText,#segmentForm input,#segmentLine {display:block;width:100%;font:inherit;padding:9px;margin:7px 0 13px;border:1px solid var(--line);border-radius:6px;}
+#pasteText {resize:vertical;min-height:5em;max-height:40vh;}
+.segment-strip {color:var(--blue);font-size:calc(var(--lyric-size) * .55);white-space:pre-wrap;overflow-wrap:anywhere;}
+.manual-reading rt,.hide-ruby .segment-strip {display:none;}
+#segmentError,#pasteError {color:#983127;}
+@media (prefers-reduced-motion:no-preference){
+ dialog[open]{animation:dialog-enter 155ms cubic-bezier(.2,.8,.2,1);}
+ @keyframes dialog-enter{from{opacity:.7;transform:translateY(5px)}to{opacity:1;transform:none}}
+ .settings-button,.practice-actions button{transition:background-color 120ms,color 120ms;}
 }
