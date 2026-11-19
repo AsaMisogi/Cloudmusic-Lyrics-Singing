@@ -105,14 +105,20 @@
   $('sessionStatus').querySelector('button').click();
   check('曲名封面与控件在同一底栏',['trackTitle','albumCover','favoriteCurrent','play','desktopQuick','seek'].every(id=>$(id).closest('.player')) && Math.abs(document.querySelector('.player').getBoundingClientRect().bottom-innerHeight)<=1);
   check('窄窗口播放器没有重叠或截断',['play','lineLoop','desktopQuick','pinQuick','volumeButton','speed','nudgeForward','playlistCurrent'].map($).every(hit));
-  check('窄导航不会因同步来源溢出', document.querySelector('.sidebar').scrollHeight <= document.querySelector('.sidebar').clientHeight);
+  onEvent('appVersion', {version:'0.3.0'});
+  const sidebar = document.querySelector('.sidebar');
+  check('窄导航不会因同步来源溢出', sidebar.scrollHeight <= sidebar.clientHeight && sidebar.scrollWidth <= sidebar.clientWidth);
   // 在最小窗口走实际入口，验证本地码图解码、关窗焦点和播放操作相互独立。
   const support = $('supportButton'), popup = $('supportDialog'), beforeSupport = actions.length;
   check('左下角赞赏入口可点', hit(support) && support.getBoundingClientRect().top >= $('moreButton').getBoundingClientRect().bottom);
+  const credits = document.querySelector('.sidebar .rail-credits');
+  check('作者、GitHub 和版本在赞赏入口下方可见', credits.getBoundingClientRect().top >= support.getBoundingClientRect().bottom &&
+    ['author','github','sidebarVersion'].map($).every(el => credits.contains(el) && hit(el)));
   support.focus(); support.click();
   const code = popup.querySelector('img');
   await code.decode().catch(() => {});
   check('赞赏弹窗展示本地原图', popup.matches(':modal') && code.naturalWidth === 1210 && code.naturalHeight === 1210);
+  check('赞赏码与弹窗使用作者署名', $('supportHint').querySelector('strong').textContent === '朝禊ASOGI' && code.alt === '朝禊ASOGI 的微信赞赏码');
   window.__uiCapture = 'support'; await wait(300); window.__uiCapture = null;
   popup.querySelector('.close-dialog').click();
   check('关窗后焦点返回赞赏入口且不发送播放指令', !popup.open && document.activeElement === support && actions.length === beforeSupport);
@@ -226,8 +232,9 @@
   check('关闭状态也保存且与英文独立', JSON.parse(localStorage.getItem('utatomo-display')).romaji===false && keptRow.querySelector('.token.en ruby')===englishRuby);
   setDictionary(false); state.resumeFollowAt=0;
   // 更新功能通过真实 Chromium DOM 验收，网络结果用固定事件代替，不打开浏览器。
-  onEvent('appVersion', {version:'0.3.0'});
-  check('当前版本来自后端', $('appVersion').textContent==='v0.3.0' && $('sidebarVersion').textContent.includes('0.3.0'));
+  check('当前版本来自后端', $('appVersion').textContent==='v0.3.0' && $('sidebarVersion').textContent==='Utatomo 0.3.0');
+  $('author').click();
+  check('作者入口提交主页操作', actions.at(-1)?.[0]==='author');
   $('github').click();
   check('GitHub 入口提交固定操作', actions.at(-1)?.[0]==='github');
   $('toolsDialog').showModal();

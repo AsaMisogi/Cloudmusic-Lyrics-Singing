@@ -91,6 +91,11 @@
         <button id="moreButton" class="nav-item"><svg aria-hidden="true"><use href="#i-settings" /></svg>设置</button>
         <button id="supportButton" class="nav-item" type="button" aria-haspopup="dialog" aria-controls="supportDialog"><svg aria-hidden="true"><use href="#i-gift" /></svg>赞赏作者</button>
       </div>
+      <footer class="rail-credits">
+        <button id="author" type="button" title="在系统浏览器打开作者的 B 站空间">由@朝禊ASOGI制作 <span aria-hidden="true">↗</span></button>
+        <button id="github" type="button" title="在系统浏览器打开项目源码与反馈页">GitHub 项目 <span aria-hidden="true">↗</span></button>
+        <span id="sidebarVersion">Utatomo</span>
+      </footer>
       <section id="sessionStatus" popover aria-labelledby="statusTitle">
         <div class="status-head"><h2 id="statusTitle">播放信息</h2>
           <button class="icon-button small" aria-label="关闭播放信息" popovertarget="sessionStatus" popovertargetaction="hide">×</button></div>
@@ -394,11 +399,7 @@
         <p id="clientDirectorySummary" class="client-directory">尚未设置</p>
         <p class="muted">连接客户端时使用此目录。保存新路径后，下次连接生效。</p>
       </section>
-      <footer class="credits"><button id="author" class="author">
-          由 @朝禊ASOGI 制作 <span>↗</span></button
-        ><button id="github" class="author" title="在系统浏览器打开项目源码与反馈页">GitHub 项目 <span>↗</span></button>
-        <span id="sidebarVersion" class="version">咏伴</span>
-      </footer></section></div></div>
+      </section></div></div>
     </dialog>
     <dialog id="pasteDialog" aria-labelledby="pasteTitle"><form id="pasteForm"><div class="modal-title"><h2 id="pasteTitle">粘贴歌词</h2><button type="button" class="close-dialog icon-button" aria-label="关闭">×</button></div><label for="pasteText">每行一句；已有假名可写成 光（ひかり）。</label><textarea id="pasteText" rows="9" required placeholder="朝の光（ひかり）を追いかけて"></textarea><p class="muted">保留 LRC 时间标签即可跟随播放。纯文本可逐行阅读。</p><p id="pasteError" role="alert"></p><button class="primary-button">导入并注音</button></form></dialog>
     <dialog id="segmentDialog" aria-labelledby="segmentTitle"><form id="segmentForm">
@@ -469,8 +470,8 @@
         <h2 id="supportTitle">赞赏作者</h2>
         <button type="button" class="close-dialog icon-button" aria-label="关闭赞赏窗口" autofocus>×</button>
       </div>
-      <div class="support-code"><img src="../assets/wechat-appreciation.png" alt="Cerulean 的微信赞赏码" loading="lazy" /></div>
-      <p id="supportHint"><strong>Cerulean</strong>用微信「扫一扫」赞赏作者</p>
+      <div class="support-code"><img src="../assets/wechat-appreciation.png" alt="朝禊ASOGI 的微信赞赏码" loading="lazy" /></div>
+      <p id="supportHint"><strong>朝禊ASOGI</strong>用微信「扫一扫」赞赏作者</p>
     </dialog>
     <dialog id="helpDialog" aria-labelledby="helpTitle">
       <div class="modal-title">

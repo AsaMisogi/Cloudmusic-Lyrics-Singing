@@ -275,7 +275,7 @@ node scripts/verify_client_bridge.cjs
 <details>
 <summary>赞赏作者</summary>
 
-点左栏「赞赏作者」，用微信扫一扫扫描 Cerulean 的赞赏码。点 × 或按 Esc 回到练唱，音乐会继续播放。
+点左栏「赞赏作者」，用微信扫一扫扫描朝禊ASOGI 的赞赏码。点 × 或按 Esc 回到练唱，音乐会继续播放。
 
 ![咏伴内的微信赞赏窗口](docs/images/support.png)
 

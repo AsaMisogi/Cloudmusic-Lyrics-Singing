@@ -603,7 +603,7 @@ function onEvent(kind, data) {
   } else if (kind === "mode") setMode(data.mode);
   else if (kind === "appVersion") {
     $("appVersion").textContent = `v${data.version}`;
-    $("sidebarVersion").textContent = `咏伴 ${data.version}`;
+    $("sidebarVersion").textContent = `Utatomo ${data.version}`;
   } else if (kind === "updateStatus") {
     $("checkUpdate").disabled = !!data.busy;
     $("checkUpdate").textContent = data.busy ? "检查中…" : "检查更新";

@@ -33,6 +33,11 @@ main {grid-area:1 / 2; min-width:0; min-height:0; background:var(--paper)}
 .sidebar .nav-count {display:inline; margin-left:auto; color:var(--muted); font:12px/1.2 "Segoe UI",sans-serif}
 .sidebar .sidebar-bottom {margin-top:auto; padding:12px 0 0; border:0}
 .sidebar .sidebar-bottom .nav-item {color:var(--muted)}
+.rail-credits {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; column-gap:4px; margin:8px 4px 0; color:var(--muted); font-size:12px; line-height:18px}
+.rail-credits button {padding:2px 0; border-radius:3px; text-align:left; white-space:nowrap}
+.rail-credits button:hover {color:var(--green); text-decoration:underline; text-underline-offset:3px}
+.rail-credits #author {flex-basis:100%}
+#sidebarVersion {white-space:nowrap; font-variant-numeric:tabular-nums}
 /* 暖金色呼应赞赏码，主操作仍沿用主题强调色；亮色下改用深琥珀文字。 */
 #supportButton {
   --support-ink: #f0cb91;
@@ -163,7 +168,7 @@ dialog .outline-button{background:transparent;border-color:var(--strong-line)}.i
 .pref-nav button[aria-pressed=true]{color:var(--green);background:var(--active)}
 .pref-body{overflow:auto;min-height:0;padding:22px 25px;scrollbar-gutter:stable}.pref-body h3{font-size:18px;margin:0 0 15px}.pref-body p{font-size:13px;line-height:1.7;color:var(--muted)}
 .pref-checks,.color-picks{gap:8px 13px}.color-picks{padding:6px 0;border-block:1px solid var(--line)}
-.pref-body .setting-row{border-color:var(--line)}.pref-body output{min-width:38px}.credits{padding-top:12px;border-top:1px solid var(--line)}.credits .author,.credits .version{color:var(--muted)}
+.pref-body .setting-row{border-color:var(--line)}.pref-body output{min-width:38px}
 #deskPreview{display:grid;place-items:center;min-height:110px;background:#777782 repeating-linear-gradient(45deg,#777782 0 10px,#888896 10px 20px);border-radius:8px;overflow:hidden}
 #deskSwatch{width:100%;text-align:center;padding:9px;line-height:1.25;text-shadow:-1px -1px #202027,1px -1px #202027,-1px 1px #202027,1px 1px #202027}#deskSwatch>*{display:block}#deskSwatch small{font-size:.57em}#deskSwatch span{font-size:.62em}
 #segmentDialog{width:min(600px,90vw)}#segmentForm label{display:block;color:var(--muted);font-weight:550}#segmentForm input{font-size:17px;padding:10px}
@@ -173,9 +178,10 @@ dialog .outline-button{background:transparent;border-color:var(--strong-line)}.i
 .library-search{background:var(--control);border-color:var(--strong-line)}.library-track{border-color:var(--line)}.library-track.current-track,.library-feedback:not(.error){background:var(--active);color:var(--green)}.track-play-icon,.track-row-actions .small[aria-pressed=true]{background:var(--active);color:var(--green)}.source-badge,.playlist-heading,.playlist-note,.tag{color:var(--muted);border-color:var(--strong-line)}.track-unavailable{color:var(--warning)}
 .search-result,.playlist-choice,.dict-footnote,.setting-row,.help-copy h3,.app-update,.client-setting{border-color:var(--line)}.help-copy h3{color:var(--ink)}.search-result strong,.dict-word,.track-text strong{color:var(--ink)}#toast:empty{display:none}
 @media(max-height:760px) {
-  .sidebar {padding-top:15px}
-  .brand {margin-bottom:20px}
-  .source-actions {margin-bottom:16px; padding-bottom:14px}
+  .sidebar {padding:12px 10px 8px}
+  .brand {margin-bottom:12px}
+  .source-actions {gap:4px; margin-bottom:10px; padding-bottom:8px}
+  .sidebar .sidebar-bottom {padding-top:6px}
   .score-bar {padding-block:12px}
   .lyric-line {padding-block:10px}
   .lyrics {padding-top:13px}
