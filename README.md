@@ -12,8 +12,6 @@ Windows 歌词跟唱工具。跟随网易云音乐，或打开本地音频练唱
 
 作者：[朝禊ASOGI](https://space.bilibili.com/315312) · [GitHub 项目与反馈](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing)
 
-想支持作者，可以点主窗口左下角的「赞赏作者」，用微信「扫一扫」扫描 Cerulean 的赞赏码。按 Esc 或点 × 即可回到练唱，音乐会继续播放。
-
 注：该项目由AI辅助完成。
 
 
