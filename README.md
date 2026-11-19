@@ -1,6 +1,25 @@
 # 咏伴 · Utatomo
 
-在网易云音乐里点一首想学的歌，咏伴会跟着切歌，把读音标在歌词上。遇到难唱的一句，点它重听，给换气处加一道分隔线，再开单句循环。也可以打开本地音频，或只留一行桌面歌词，边做别的事边跟唱。
+Windows 歌词跟唱工具。跟随网易云音乐，或打开本地音频练唱；支持日语假名 / 罗马音、英语音标，以及可选的中文粤语注音。最近播放、曲库收藏和本地歌单，让常练的歌随手可达。
+
+
+受不了网易云音乐自带的歌词功能而诞生的产物，主要是为了方便自己跟唱、学新曲子什么的，虽然本地音频也支持，但是因为网易云用得比较多，所以做了联动功能，方便直接从网易云歌单里即开即用。
+
+不保证注音百分百准确，但大部分是能识别出来的，识别不出的或者识别错误的部分支持手动修正。
+
+工具连接网易云客户端后，在网易云里切歌，会自动同步到工具，工具里的播放也会和网易云同步。
+
+
+作者：[朝禊ASOGI](https://space.bilibili.com/315312) · [GitHub 项目与反馈](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing)
+
+想支持作者，可以点主窗口左下角的「赞赏作者」，用微信「扫一扫」扫描 Cerulean 的赞赏码。按 Esc 或点 × 即可回到练唱，音乐会继续播放。
+
+注：该项目由AI辅助完成。
+
+
+B站演示视频：
+
+https://www.bilibili.com/video/BV1ZfHf6pEik/
 
 [下载 Windows x64 便携版](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) · [0.5.0–0.8.3 新功能](docs/release-0.4.0-to-0.8.3.md) · [B 站演示](https://www.bilibili.com/video/BV1ZfHf6pEik/)
 
