@@ -1,5 +1,5 @@
 """发布后分别使用固定线路验签 latest，下载两种附件；不会安装或改动运行中的软件。"""
-from contextlib import TemporaryDirectory
+from tempfile import TemporaryDirectory
 from pathlib import Path
 import sys
 import threading
