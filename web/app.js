@@ -554,12 +554,47 @@ function showSearch(data) {
   if (!$("searchDialog").open) $("searchDialog").showModal();
 }
 let pendingUpdate = null;
+let portableState = null;
+const packageLabel = d => (d.kind === "patch" ? "增量补丁" : "完整包") + " · " + (d.size / 1048576).toFixed(1) + " MiB";
+function portableAction() {
+  const actionName = {available:"downloadPortable", ready:"restartUpdated", error:"checkUpdate"}[portableState?.phase];
+  if (actionName) action(actionName);
+}
+function renderPortable(d) {
+  portableState = d;
+  const busy = ["checking", "downloading", "ready", "restarting"].includes(d.phase);
+  $("updateSourceRow").hidden = false;
+  $("updateSource").value = d.source;
+  $("updateSource").disabled = $("checkUpdate").disabled = busy;
+  $("checkUpdate").textContent = d.phase === "checking" ? "检查中…" : "检查更新";
+  const offer = d.phase === "available";
+  const label = offer ? (d.kind === "patch" ? "下载增量补丁" : "下载完整包") :
+    d.phase === "ready" ? "重启并更新" : d.phase === "error" ? "重新检查" : "";
+  $("updateNext").hidden = !label || d.phase === "error";
+  $("updateNext").textContent = label;
+  $("updateFeedback").textContent = offer ? `发现 ${d.version}：${packageLabel(d)}。${d.message}` : d.message;
+  $("downloadUpdate").disabled = !label;
+  $("downloadUpdate").textContent = label || (d.phase === "downloading" ? "准备更新中…" : "检查中…");
+  $("updateTitle").textContent = d.phase === "ready" ? "新版已就绪" : d.phase === "error" ? "更新未完成" :
+    d.phase === "downloading" ? "正在准备更新" : "发现新版本";
+  $("updateDescription").textContent = d.version ? `咏伴 ${d.current} → ${d.version}　${packageLabel(d)}` : `当前版本 ${d.current}`;
+  $("updateDetail").textContent = d.message;
+  $("updateProgress").hidden = d.phase !== "downloading";
+  if (d.percent == null) $("updateProgress").removeAttribute("value"); else $("updateProgress").value = d.percent;
+  $("laterUpdate").textContent = d.phase === "downloading" ? "后台下载" : "稍后再说";
+  if (!offer && d.phase !== "ready") pendingUpdate = null;
+  if (d.prompt && !$("updateDialog").open) {
+    pendingUpdate = d;
+    if (d.manual && $("toolsDialog").open) $("toolsDialog").close();
+    showPendingUpdate();
+  }
+}
 function showPendingUpdate() {
   // 启动更新结果可能先于路径引导完成；等已有弹窗关闭后再提示，避免叠加焦点。
   if (!pendingUpdate || document.querySelector("dialog[open]")) return;
   const data = pendingUpdate;
   pendingUpdate = null;
-  $("updateDescription").textContent = `当前版本 ${data.current}，最新正式版本 ${data.version}。是否前往下载更新？`;
+  if (!portableState) $("updateDescription").textContent = `当前版本 ${data.current}，最新正式版本 ${data.version}。是否前往下载更新？`;
   $("updateDialog").showModal();
 }
 document.querySelectorAll("dialog").forEach(dialog => {
@@ -604,7 +639,8 @@ function onEvent(kind, data) {
   else if (kind === "appVersion") {
     $("appVersion").textContent = `v${data.version}`;
     $("sidebarVersion").textContent = `Utatomo ${data.version}`;
-  } else if (kind === "updateStatus") {
+  } else if (kind === "portableUpdate") renderPortable(data);
+  else if (kind === "updateStatus") {
     $("checkUpdate").disabled = !!data.busy;
     $("checkUpdate").textContent = data.busy ? "检查中…" : "检查更新";
     if (data.busy) $("updateFeedback").textContent = "正在检查 GitHub 正式版本…";
@@ -855,7 +891,12 @@ $("github").onclick = () => action("github");
 $("checkUpdate").onclick = () => action("checkUpdate");
 $("releasePage").onclick = () => action("releases");
 $("laterUpdate").onclick = () => $("updateDialog").close();
+$("updateSource").onchange = e => action("updateSource", e.target.value);
+$("updateNext").onclick = portableAction;
+$("updateRelease").onclick = () => action("openUpdate");
+document.querySelectorAll("[data-update-baidu]").forEach(b => b.onclick = () => action("updateBaidu"));
 $("downloadUpdate").onclick = () => {
+  if (portableState) { portableAction(); return; }
   $("updateDialog").close();
   action("openUpdate");
 };

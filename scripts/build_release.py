@@ -30,6 +30,15 @@ def main():
                     "--distpath", str(dist_dir), "Utatomo.spec"],
                    cwd=ROOT, env=build_env, check=True)
     bundle = dist_dir / "Utatomo"
+    # 助手不依赖被替换的 Qt / Python。只嵌入公钥，普通便携包构建无需签名私钥。
+    helper = bundle / "_internal/update/Utatomo-Update.exe"
+    helper.parent.mkdir(exist_ok=True)
+    csc = windows / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+    subprocess.run([str(csc), "/nologo", "/target:winexe", "/optimize+", "/utf8output",
+                    "/codepage:65001", "/r:System.Windows.Forms.dll", "/r:System.Web.Extensions.dll",
+                    "/r:System.IO.Compression.dll", "/r:System.IO.Compression.FileSystem.dll",
+                    f"/resource:{ROOT / 'assets/update-signer.cer'},signer", f"/out:{helper}", str(ROOT / "scripts/UpdateHelper.cs")],
+                   cwd=ROOT, check=True)
     notices = bundle / "THIRD-PARTY-LICENSES"
     notices.mkdir(exist_ok=True)
     distributions = []
@@ -62,7 +71,7 @@ def main():
         shutil.copy2(ROOT / "LICENSE", bundle / "LICENSE")
     # The README's relative image links also work in the extracted archive.
     shutil.copytree(ROOT / "docs/images", bundle / "docs/images", dirs_exist_ok=True)
-    for name in ("architecture.md", "third-party.md", "verification.md", "design.md"):
+    for name in ("architecture.md", "third-party.md", "verification.md", "design.md", "增量发版.md"):
         shutil.copy2(ROOT / "docs" / name, bundle / "docs" / name)
     # 版本说明沿用统一文件名；新版本无需再手动维护一份打包清单。
     for note in (ROOT / "docs").glob("release-*.md"):

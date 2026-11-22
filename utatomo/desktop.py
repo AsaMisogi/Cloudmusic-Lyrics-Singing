@@ -439,6 +439,48 @@ class Overlay(QWidget):
             self.desktop.change("position", [self.x(), self.y()])
 
 
+def selected_content(line, o):
+    """统一判断并排版当前勾选的内容；只有空白的时间标记不算一句歌词。"""
+    cells, unaligned = lyric_cells(line, o["roman"])
+    # 原文打开时，假名紧贴对应汉字；仅注音模式和没有对应断点的手写读音仍可独立阅读。
+    notes_only = ""
+    if o["reading"]:
+        if not o["original"]:
+            manual = line.get("segments", {}).get("roman" if o["roman"] else "kana")
+            tokens = line.get("cantoneseTokens", line.get("tokens", []))
+            readings = [
+                (
+                    t.get("romaji")
+                    if o["roman"] and t.get("language") == "ja"
+                    else None
+                )
+                or t.get("reading")
+                or (t["text"] if t.get("language") == "ja" else "")
+                for t in tokens
+            ]
+            notes_only = manual or " ".join(filter(None, readings))
+        else:
+            notes_only = unaligned
+    if not o["reading"]:
+        cells = [(base, "") for base, _ in cells]
+    if not o["original"]:
+        cells = []
+    trans = line.get("translation", "") if o["translation"] else ""
+    if not any((base + note).strip() for base, note in cells):
+        cells = []
+    return cells, notes_only.strip(), trans.strip()
+
+
+def desktop_line(lines, index, options):
+    """按歌曲时间轴向前找，而非记住屏幕上一帧：倒拖、跳播、换歌都不会串句。"""
+    if 0 <= index < len(lines):
+        for candidate in range(index, -1, -1):
+            content = selected_content(lines[candidate], options)
+            if any(content):
+                return candidate, content
+    return index, ([], "", "")
+
+
 class Desktop:
     def __init__(self, bridge, path, testing=False):
         self.bridge, self.path = bridge, path
@@ -592,6 +634,20 @@ class Desktop:
             if self.starts and self.starts[0] is not None
             else self.manual
         )
+        pos = (position or 0) - b.lyric_offset
+        o = self.opts
+        screen = self.overlay.screen()
+        if playing and self.starts and self.starts[0] is not None and o["original"]:
+            interval = max(1, round(1000 / max(1, screen.refreshRate() or 60)))
+            if not self.animation.isActive() or interval != self.animation.interval():
+                self.animation.start(interval)
+        elif self.animation.isActive():
+            self.animation.stop()
+        layout_key = (idx, self.overlay.devicePixelRatioF())
+        same_layout = self.last == layout_key
+        if not same_layout:
+            self.display_index, (cells, notes_only, trans) = desktop_line(lines, idx, o)
+        idx = self.display_index
         line = lines[idx] if 0 <= idx < len(lines) else {}
         end = (
             line.get("end")
@@ -604,46 +660,11 @@ class Desktop:
             or line.get("start")
             or 0
         )
-        pos = (position or 0) - b.lyric_offset
-        o = self.opts
-        screen = self.overlay.screen()
-        if playing and self.starts and self.starts[0] is not None and o["original"]:
-            interval = max(1, round(1000 / max(1, screen.refreshRate() or 60)))
-            if not self.animation.isActive() or interval != self.animation.interval():
-                self.animation.start(interval)
-        elif self.animation.isActive():
-            self.animation.stop()
-        layout_key = (idx, self.overlay.devicePixelRatioF())
-        if self.last == layout_key:
+        if same_layout:
             self.progress(line, pos, end)
             return
         self.last = layout_key
         self.progress_key = None
-        cells, unaligned = lyric_cells(line, o["roman"])
-        # 原文打开时，假名紧贴对应汉字；仅注音模式和没有对应断点的手写读音仍可独立阅读。
-        notes_only = ""
-        if o["reading"]:
-            if not o["original"]:
-                manual = line.get("segments", {}).get("roman" if o["roman"] else "kana")
-                tokens = line.get("cantoneseTokens", line.get("tokens", []))
-                readings = [
-                    (
-                        t.get("romaji")
-                        if o["roman"] and t.get("language") == "ja"
-                        else None
-                    )
-                    or t.get("reading")
-                    or (t["text"] if t.get("language") == "ja" else "")
-                    for t in tokens
-                ]
-                notes_only = manual or " ".join(filter(None, readings))
-            else:
-                notes_only = unaligned
-        if not o["reading"]:
-            cells = [(base, "") for base, _ in cells]
-        if not o["original"]:
-            cells = []
-        trans = line.get("translation", "") if o["translation"] else ""
         if not (cells or trans or notes_only):
             cells = [("等待歌词" if not line else "此句无所选内容", "")]
         width = self.overlay.width() - 20

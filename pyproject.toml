@@ -1,6 +1,6 @@
 [project]
 name = "utatomo"
-version = "0.8.3"
+version = "0.9.0"
 description = "咏伴：日英粤语注音与曲库练唱助手"
 license = "GPL-3.0-only"
 requires-python = ">=3.12,<3.13"

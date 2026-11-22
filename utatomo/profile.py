@@ -11,6 +11,7 @@ from pathlib import Path
 
 FILES = (
     "settings.json",
+    "updates.json",
     "desktop.json",
     "song-overrides.json",
     "overrides.json",

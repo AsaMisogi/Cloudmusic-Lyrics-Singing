@@ -136,7 +136,11 @@ BAT 同步调用 Python，后端和 Qt 主窗口属于同一个进程。Qt 退�
 
 `web/app.js` 在 document 捕获阶段处理已绑定快捷键，取消默认行为与后续传播，避免控件焦点引起播放键变成开关、选项或滑块操作。空格 keyup 同样取消原生激活。未绑定键保留控件交互；文本输入、contenteditable、输入法组合和模态弹窗不拦截。方向键允许连续操作，播放和循环切换忽略自动重复事件。
 
-## 应用更新（0.3.0）
+## 便携版更新（0.9.0）
+
+`portable_updates.py` 在独立更新队列读取固定仓库最新正式 Release 的签名清单，按基线选补丁或完整包。两个下载源共用随软件固定的发行公钥。`UpdateHelper.cs` 在同卷暂存区按签名文件表重建整包，只在确认重启后等待当前进程退出、切换受管文件、启动新版。WebChannel 初始化回执标记启动成功；新进程提前退出则恢复原文件。制作、发布和断电恢复见[增量发版](增量发版.md)。
+
+## 源码运行的版本检查（0.3.0 起）
 
 - 使用 [GitHub Latest Release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)，匿名 HTTPS 读取仓库维护者指定的最新正式版；失败后改查 [GitHub 官网最新版入口](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases)。响应必须为 200、JSON 对象，且 draft / prerelease 均为 false。正式标签使用可选 v 前缀及三段数字，与当前版本按整数元组比较；不把日期、标签排序或字符串大小当成版本新旧。
 - 请求使用现有 requests 依赖，连接 / 读取超时分别为 3.05 / 7 秒，保留默认 TLS 校验，不跟随重定向，不自动重试。403 / 429、404、其他 HTTP 错误、离线和无效响应均触发官网后备检查；两路失败不冒充最新版本；下次启动或手动操作可以重试。公共 API 限流时自动由官网入口确认版本，不依赖 API 配额。官网请求使用 GET + stream，只读跳转头，不跟随或下载网页正文；只接受 HTTPS github.com、本仓库 /releases/tag/ 路径和有效正式标签，拒绝登录、外站、其他仓库、查询参数及预发布标签。两路失败才报告无法确认，明确建议检查网络或代理。

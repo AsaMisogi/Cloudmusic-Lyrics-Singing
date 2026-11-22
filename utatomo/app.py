@@ -46,6 +46,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow
 
 from .line_edits import apply_text
 from .desktop import MainWindow, Desktop, startup
+from .portable_updates import PortableUpdates
 from .profile import apply_pending, export_backup, stage_backup, read_map, write_map
 from PySide6.QtWidgets import QMessageBox
 from .language import Annotator
@@ -142,6 +143,8 @@ class Bridge(QObject):
         self.update_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="update"
         )
+        self.portable = (PortableUpdates(self, WRITABLE_ROOT, DATA, __version__)
+                         if getattr(sys, "frozen", False) else None)
         self.update_started = False
         self.update_busy = False
         self.update_manual = False
@@ -257,6 +260,17 @@ class Bridge(QObject):
             self.send("lyrics", {"lines": self.lines})
         LOG.info("界面已连接；数据目录：%s", DATA)
         self.send("appVersion", {"version": __version__})
+        if getattr(self, "portable", None):
+            self.portable.report()
+            # 只有新版页面完成 WebChannel 握手才给助手回执；文件名只允许本目录的更新任务。
+            if "--updated" in sys.argv:
+                args = sys.argv[sys.argv.index("--updated") + 1:]
+                if args and re.fullmatch(r"\.utatomo-update-[a-zA-Z0-9_-]+", args[0]):
+                    job = WRITABLE_ROOT / args[0]
+                    if (job / "version").is_file() and (job / "version").read_text(encoding="utf8") == __version__:
+                        ack = job / "started.tmp"
+                        ack.write_text(__version__, encoding="utf8")
+                        ack.replace(job / "started")
         # Qt 提供本机可用字体族，前端不扫描文件或请求联网字体。
         self.send("lyricFonts", {"families": QFontDatabase.families()})
         self._send_library()
@@ -268,6 +282,9 @@ class Bridge(QObject):
     def _check_update(self, manual=True):
         """合并重复点击；手动加入启动检查时，仍显示这次检查的完整结果。"""
         if self.closing:
+            return
+        if getattr(self, "portable", None):
+            self.portable.check(manual)
             return
         self.update_manual = self.update_manual or manual
         if self.update_busy:
@@ -658,6 +675,14 @@ class Bridge(QObject):
             self._open_project_url(REPOSITORY_URL)
         elif name == "checkUpdate":
             self._check_update()
+        elif name == "updateSource" and self.portable:
+            self.portable.set_source(value)
+        elif name == "downloadPortable" and self.portable:
+            self.portable.download()
+        elif name == "restartUpdated" and self.portable:
+            self.portable.restart()
+        elif name == "updateBaidu":
+            self._open_project_url("https://pan.baidu.com/s/1ZKFEDhp-ZP8Tc7GGMzRvMg?pwd=kzx8")
         elif name == "openUpdate":
             # 不接受前端传来的 URL，只打开本次检查得到的项目 Release。
             self._open_project_url(self.update_url or RELEASES_URL)
@@ -1388,6 +1413,8 @@ class Bridge(QObject):
         self.cloud.close()
         self.language_pool.shutdown(wait=False, cancel_futures=True)
         self.network_pool.shutdown(wait=False, cancel_futures=True)
+        if self.portable:
+            self.portable.close()
         self.update_pool.shutdown(wait=False, cancel_futures=True)
         # 已确认重启必须完成「关闭 → 启动」，不能因主程序退出只执行前半步。
         self.launch_pool.shutdown(wait=True, cancel_futures=True)

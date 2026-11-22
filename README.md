@@ -25,13 +25,13 @@ https://www.bilibili.com/video/BV1ZfHf6pEik/
 
 ## 第一次使用
 
-1. 在 [GitHub Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.8.3-windows-x64.zip`，完整解压到可写目录，例如 `D:\Utatomo`。双击 `Utatomo.exe`，保留同目录下的 `_internal`。便携版适用于 Windows 10 / 11 x64，已包含 Python、Qt 和离线注音词典。另有[百度网盘](https://pan.baidu.com/s/1ZKFEDhp-ZP8Tc7GGMzRvMg?pwd=kzx8)（提取码：`kzx8`）。
+1. 在 [GitHub Releases](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 下载 `Utatomo-0.9.0-windows-x64.zip`，完整解压到可写目录，例如 `D:\Utatomo`。双击 `Utatomo.exe`，保留同目录下的 `_internal`。便携版适用于 Windows 10 / 11 x64，已包含 Python、Qt 和离线注音词典。另有[百度网盘](https://pan.baidu.com/s/1ZKFEDhp-ZP8Tc7GGMzRvMg?pwd=kzx8)（提取码：`kzx8`）。
 2. **跟随网易云**：首次启动时确认包含 `cloudmusic.exe` 的目录，选左栏「网易云 → 连接客户端」。如果客户端已在播放，咏伴会先询问是否重启；保存路径后，也可以随时在「设置 → 连接与更新」更改。
 3. **先试唱或练本地歌曲**：点「体验示例」试用随包的原创提示音轨，或点「打开本地音频」。可以跳过网易云路径设置，不影响本地练唱。
 
 ![首次进入练唱谱时的连接客户端、打开本地音频和体验示例入口](docs/images/welcome.png)
 
-**从旧版升级**：退出旧程序，把新包解压到新目录，再复制旧版的 `data/`。已有「启动与备份」的版本也可以先导出、再在新版恢复。不要用旧版的 `_internal` 覆盖新包。
+**从 0.8.3 升级**：从正式发布页下载名为 `0.8.3-to-0.9.0-patch.zip` 结尾的小补丁，解压到**单独的空文件夹**。从托盘退出旧版，双击补丁顶层的 `Utatomo-Update.exe`，选中原来的 `Utatomo.exe`。更早版本请完整解压便携包到新目录，退出旧版后复制原 `data/`。
 
 ## 在一首歌里练一句
 
@@ -51,7 +51,7 @@ https://www.bilibili.com/video/BV1ZfHf6pEik/
 
 ## 把歌词放到桌面
 
-点底栏「桌面歌词」，即可在其他窗口上跟唱。假名贴在对应汉字上方，译文另起一行，已唱部分随音乐着色。YRC 和增强 LRC 使用歌词自带的逐字时间；普通 LRC 在行内估算，无时间标签的纯文本可以手动换句。
+点底栏「桌面歌词」，即可在其他窗口上跟唱。间奏遇到空行，会保留本曲上一句有可见内容的歌词；拖动进度也按歌曲时间轴选择。假名贴在对应汉字上方，译文另起一行，已唱部分随音乐着色。YRC 和增强 LRC 使用歌词自带的逐字时间；普通 LRC 在行内估算，无时间标签的纯文本可以手动换句。
 
 ![透明桌面歌词：已唱的「朝」和未唱的「光」颜色不同，假名随汉字排列](docs/images/desktop.png)
 
@@ -220,15 +220,15 @@ https://www.bilibili.com/video/BV1ZfHf6pEik/
 | `data/settings.json` | 已确认的网易云安装目录 |
 | `data/logs/utatomo.log` | 运行与错误日志 |
 
-启动和手动更新检查访问 GitHub；歌曲搜索、收藏元数据、歌词与封面从网易云获取；日英词典查询使用有道，补充机译使用 Google / MyMemory。粤拼和曲库搜索不联网。首次在线请求需要联网，已缓存的部分内容可离线使用，工具不上传音频文件。退出程序后删除 `data/cache/` 可清理内容缓存；更新或备份前退出程序，完整保留 `data/` 可保留个人数据。曲库无法打开时显示原因，不会用空库覆盖原数据，本地练唱及同步仍可使用。
+启动和手动更新检查访问所选下载源；歌曲搜索、收藏元数据、歌词与封面从网易云获取；日英词典查询使用有道，补充机译使用 Google / MyMemory。粤拼和曲库搜索不联网。首次在线请求需要联网，已缓存的部分内容可离线使用，工具不上传音频文件。退出程序后删除 `data/cache/` 可清理内容缓存；更新或备份前退出程序，完整保留 `data/` 可保留个人数据。曲库无法打开时显示原因，不会用空库覆盖原数据，本地练唱及同步仍可使用。
 
 ## 检查更新
 
-每次打开工具，后台自动检查一次 GitHub 最新正式 Release；发现更新后弹窗显示当前和最新版本，点击「前往 GitHub 下载」会在系统浏览器打开对应发布页。「稍后再说」、关闭或 Esc 均保留当前程序，下次启动仍会检查。首次路径设置或其他弹窗打开时，更新提示等待其关闭后出现。
+在 **设置 → 连接与更新 → 应用更新** 选择下载源。默认「自动（国内优先）」：先试国内加速，连接、传输或签名校验失败再试 GitHub；选「仅国内加速」或「仅 GitHub 直连」则只走该线路。
 
-在「设置 → 连接与更新 → 应用更新」可查看当前版本并点击「检查更新」。检查中禁用按钮，完成后显示是否需要更新；网络失败、请求限流或发布信息异常时显示原因，可重试或点击「查看 GitHub 发布页」。启动检查无更新或失败时不弹窗，不影响歌词与本地练唱。
+每次启动会在后台检查一次正式版。发现新版后，点 **下载增量补丁**，准备好后再点 **重启并更新**。下载期间可以继续练唱，曲库、注音修正与设置保留。跨过补丁基线、或本机文件不匹配时，会先显示完整包大小，由你决定是否下载。源码运行仍只检查版本、打开发布页，不改工作区。
 
-检查先访问 GitHub 公开发布接口；接口限流、超时或响应异常时自动改查 GitHub 官网的最新版 Release 入口，无需消耗匿名 API 配额。两路只要有一路正常即可确认版本，沿用环境或 Windows 系统代理设置，不要求 GitHub 登录，不上传歌曲、歌词或本地设置；不检查预发布和仅有标签的版本，不自动下载安装。升级时退出旧程序，把新包完整解压到新目录，再复制原 `data/` 文件夹；保留新包的 `_internal`，不要混用旧依赖。
+更新提示和设置中都保留 [GitHub 发布页](https://github.com/AsaMisogi/Cloudmusic-Lyrics-Singing/releases/latest) 与[百度网盘](https://pan.baidu.com/s/1ZKFEDhp-ZP8Tc7GGMzRvMg?pwd=kzx8)（提取码：`kzx8`）。制作下个版本见[增量发版手册](docs/增量发版.md)。
 
 ## 从源码运行与打包
 
@@ -264,7 +264,7 @@ node scripts/verify_client_bridge.cjs
 
 打包需要 Windows x64，产物位于 `dist/`。若该目录的便携版正在运行，可加 `--dist-dir dist/update-fix` 在独立目录重建，避免覆盖被占用的文件。源码采用 [GPLv3](LICENSE)；第三方组件保留各自许可证，便携包附带 `THIRD-PARTY-LICENSES/`。歌曲、歌词与在线服务内容归各自权利人。
 
-图标源文件为 `assets/icon.svg`。构建时 `scripts/create_icon.py` 自动生成 16、24、32、48、64、128、256 像素的 `assets/icon.ico`，由 PyInstaller 嵌入 EXE。更新版本时请完整解压新包，保留原 `data/` 以沿用个人设置。
+图标源文件为 `assets/icon.svg`。构建时 `scripts/create_icon.py` 自动生成 16、24、32、48、64、128、256 像素的 `assets/icon.ico`，由 PyInstaller 嵌入 EXE。手动迁移到新目录时，退出旧版后复制原 `data/` 以沿用个人设置。
 
 更多资料：[架构说明](docs/architecture.md) · [第三方来源](docs/third-party.md) · [验收记录](docs/verification.md)
 

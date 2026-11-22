@@ -302,3 +302,9 @@ input::placeholder,textarea::placeholder{color:var(--quiet)}
   .now-playing .current-track-actions {flex-direction:column;gap:0}
   .now-playing .current-track-actions button {height:22px}
 }
+
+/* 更新区沿用设置行与文字按钮；两条手动下载入口在窄窗口里自然换行。 */
+.update-links { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; margin:8px 0; }
+#updateSourceRow[hidden], #updateNext[hidden], #updateProgress[hidden] { display:none; }
+#updateProgress { width:100%; accent-color:var(--accent); }
+#updateDialog .dialog-actions { margin-top:16px; }

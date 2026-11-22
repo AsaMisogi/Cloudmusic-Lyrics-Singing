@@ -391,8 +391,10 @@
         <div class="practice-actions"><button id="backupExport">导出备份…</button><button id="backupImport">恢复备份…</button></div><p id="backupFeedback" role="status" class="muted"></p>
       </section><section id="pref-client" hidden><h3>连接与更新</h3><section class="app-update" aria-labelledby="updateSettingTitle">
         <div class="setting-row"><strong id="updateSettingTitle">应用更新 <span id="appVersion" class="muted"></span></strong><button id="checkUpdate" class="outline-button">检查更新</button></div>
+        <label id="updateSourceRow" class="setting-row" hidden><span>下载源</span><select id="updateSource"><option value="auto">自动（国内优先）</option><option value="mirror">仅国内加速</option><option value="github">仅 GitHub 直连</option></select></label>
         <p id="updateFeedback" class="muted" role="status" aria-live="polite">每次启动自动检查正式版本，有更新时提示前往 GitHub 下载。</p>
-        <button id="releasePage" class="text-button">查看 GitHub 发布页 ↗</button>
+        <button id="updateNext" class="primary-button" hidden></button>
+        <div class="update-links"><button id="releasePage" class="text-button">GitHub 发布页 ↗</button><button data-update-baidu class="text-button">百度网盘 ↗</button><span class="muted">提取码：kzx8</span></div>
       </section>
       <section class="client-setting" aria-labelledby="clientSettingTitle">
         <div class="setting-row"><strong id="clientSettingTitle">网易云音乐路径</strong><button id="editClientPath" class="outline-button">更改路径</button></div>
@@ -414,7 +416,9 @@
     <dialog id="updateDialog" aria-labelledby="updateTitle" aria-describedby="updateDescription">
       <div class="modal-title"><h2 id="updateTitle">发现新版本</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
       <p id="updateDescription"></p>
-      <p class="muted">将在系统浏览器打开 GitHub 发布页。下载后完整解压新包，保留原 data/ 文件夹以沿用个人设置和注音修正。</p>
+      <p id="updateDetail" class="muted" role="status">在系统浏览器打开发布页，下载 Windows 便携包。</p>
+      <progress id="updateProgress" aria-label="更新下载进度" max="100" hidden></progress>
+      <div class="update-links"><button id="updateRelease" class="text-button">GitHub 发布页 ↗</button><button data-update-baidu class="text-button">百度网盘 ↗</button><span class="muted">提取码：kzx8</span></div>
       <div class="dialog-actions"><button id="laterUpdate" autofocus>稍后再说</button><button id="downloadUpdate" class="primary-button">前往 GitHub 下载 ↗</button></div>
     </dialog>
     <dialog id="clientPathDialog" aria-labelledby="clientPathTitle" aria-describedby="clientPathDescription">
@@ -505,7 +509,7 @@
         <h3>网络与退出</h3>
         <p>
           歌词来自网易云，中文词义来自有道；点击“补充中文机译”才会把缺少译文的歌词发送给
-          Google 翻译；不可用时使用 MyMemory。启动及手动检查更新会访问 GitHub 正式发布接口。关闭主窗口默认收进托盘；右键托盘图标，选择「退出咏伴」即可退出。
+          Google 翻译；不可用时使用 MyMemory。便携版默认通过国内加速检查 GitHub 正式版，可在「连接与更新」切换下载源。关闭主窗口默认收进托盘；右键托盘图标，选择「退出咏伴」即可退出。
         </p>
       </div>
     </dialog>
